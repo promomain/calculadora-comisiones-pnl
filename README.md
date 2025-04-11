@@ -1,16 +1,13 @@
-# Calculadora de Comisiones
+# Calculadora de Comisiones y PNL
 
-Una aplicación web para analizar comisiones de transacciones completadas a partir de archivos CSV, generando informes detallados y visualizaciones gráficas por día.
+Aplicación web desarrollada con Flask para calcular y analizar comisiones y ganancias/pérdidas en operaciones financieras P2P.
 
 ## Características
 
-- Análisis de comisiones agrupadas por día
-- Filtrado automático de transacciones (solo considera las completadas)
-- Soporte para diferentes formatos de CSV (detección automática de columnas)
-- Generación de informes detallados
-- Visualización gráfica de comisiones vs. transacciones
-- Descarga de informes y gráficos
-- Interfaz web amigable
+- **Calculadora de Comisiones**: Analiza las comisiones generadas por operaciones completadas
+- **Calculadora de PNL (Profit and Loss)**: Calcula ganancias y pérdidas en operaciones P2P
+- **Historial de Análisis**: Permite revisar análisis anteriores sin tener que cargar nuevamente los archivos
+- **Informes Detallados**: Genera informes en texto, gráficos y archivos CSV
 
 ## Estructura del Proyecto
 
@@ -22,61 +19,40 @@ Una aplicación web para analizar comisiones de transacciones completadas a part
 
 ## Requisitos
 
-- Python 3.8 o superior
-- Dependencias listadas en `requirements.txt`
+- Python 3.7+
+- Flask
+- Pandas
+- Matplotlib
+- Werkzeug
 
 ## Instalación
 
-1. Clona este repositorio:
-   ```bash
-   git clone https://github.com/tuusuario/calculadora-comisiones.git
-   cd calculadora-comisiones
-   ```
+1. Clonar el repositorio:
+```
+git clone https://github.com/tu-usuario/calculadora-comisiones-pnl.git
+cd calculadora-comisiones-pnl
+```
 
-2. Crea un entorno virtual:
-   ```bash
-   python -m venv venv
-   ```
+2. Instalar dependencias:
+```
+pip install -r requirements.txt
+```
 
-3. Activa el entorno virtual:
-   - En Windows:
-     ```bash
-     venv\Scripts\activate
-     ```
-   - En macOS/Linux:
-     ```bash
-     source venv/bin/activate
-     ```
+3. Ejecutar la aplicación:
+```
+python app.py
+```
 
-4. Instala las dependencias:
-   ```bash
-   pip install -r requirements.txt
-   ```
+4. Abrir en el navegador:
+```
+http://localhost:5000
+```
 
 ## Uso
 
-### Aplicación Web
-
-1. Inicia la aplicación web:
-   ```bash
-   python app.py
-   ```
-
-2. Abre tu navegador y ve a `http://127.0.0.1:5000/`
-
-3. Sube tu archivo CSV y visualiza los resultados
-
-### Línea de Comandos
-
-También puedes usar el script desde la línea de comandos:
-
-```bash
-python comisiones_flexible.py ruta/a/tu/archivo.csv
-```
-
-Opciones adicionales:
-- `--no-grafico`: No generar gráfico
-- `--salida nombre`: Especificar un nombre base para los archivos de salida
+1. Sube archivos CSV con el formato adecuado
+2. La aplicación procesará los datos y generará informes detallados
+3. Podrás descargar informes en formato texto, CSV y gráficos
 
 ## Formato de CSV Esperado
 
@@ -94,7 +70,7 @@ El archivo CSV debe contener al menos las siguientes columnas:
 
 ## Licencia
 
-Este proyecto está licenciado bajo la Licencia MIT - vea el archivo LICENSE para más detalles.
+MIT
 
 ## Contribuciones
 
