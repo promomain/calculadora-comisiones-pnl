@@ -1,0 +1,476 @@
+from flask import Flask, render_template, request, redirect, url_for, send_from_directory, flash
+import os
+import uuid
+from werkzeug.utils import secure_filename
+import matplotlib
+matplotlib.use('Agg')  # Configuración para usar sin interfaz gráfica
+import matplotlib.pyplot as plt
+from comisiones_flexible import calcular_comisiones_por_dia, contar_transacciones_por_dia, generar_informe
+from pnl_calculator import generar_informe_pnl
+
+app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
+
+# Configuración de carga de archivos
+UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', 'uploads')
+ALLOWED_EXTENSIONS = {'csv'}
+OUTPUT_FOLDER = os.environ.get('OUTPUT_FOLDER', 'resultados')
+
+# Crear carpetas si no existen
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+os.makedirs('static', exist_ok=True)  # Asegurar que existe la carpeta static
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['OUTPUT_FOLDER'] = OUTPUT_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB máximo
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def get_analysis_history():
+    """Obtiene el historial de análisis realizados"""
+    history = []
+    resultados_path = app.config['OUTPUT_FOLDER']
+    
+    # Obtener todos los archivos de la carpeta de resultados
+    files = os.listdir(resultados_path)
+    
+    # Identificar los IDs únicos de análisis (cada análisis tiene varios archivos con el mismo ID)
+    unique_ids = set()
+    for file in files:
+        if '_informe.txt' in file:
+            # Extraer el ID del nombre del archivo
+            file_id = file.split('_informe.txt')[0]
+            unique_ids.add(file_id)
+    
+    # Para cada ID, reunir información sobre el análisis
+    for file_id in unique_ids:
+        analysis_info = {'id': file_id, 'tipo': 'desconocido', 'fecha': None}
+        
+        # Detectar tipo de análisis (comisiones o PNL)
+        csv_exists = os.path.exists(os.path.join(resultados_path, f"{file_id}_informe.csv"))
+        analysis_info['tipo'] = 'pnl' if csv_exists else 'comisiones'
+        
+        # Obtener fecha de creación del archivo como fecha del análisis
+        informe_path = os.path.join(resultados_path, f"{file_id}_informe.txt")
+        if os.path.exists(informe_path):
+            timestamp = os.path.getmtime(informe_path)
+            analysis_info['fecha'] = timestamp
+            
+            # Leer las primeras líneas del informe para obtener información adicional
+            try:
+                with open(informe_path, 'r') as f:
+                    contenido = f.read(500)  # Leer solo las primeras 500 caracteres
+                    analysis_info['resumen'] = contenido.split('\n')[0] if contenido else "Sin resumen disponible"
+            except:
+                analysis_info['resumen'] = "Error al leer el resumen"
+        
+        history.append(analysis_info)
+    
+    # Ordenar por fecha (más reciente primero)
+    history.sort(key=lambda x: x['fecha'] if x['fecha'] else 0, reverse=True)
+    
+    return history
+
+@app.route('/favicon.png')
+def favicon():
+    return send_from_directory('static', 'favicon.png')
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        flash('No se ha seleccionado ningún archivo', 'error')
+        return redirect(request.url)
+    
+    file = request.files['file']
+    
+    if file.filename == '':
+        flash('No se ha seleccionado ningún archivo', 'error')
+        return redirect(request.url)
+    
+    if file and allowed_file(file.filename):
+        # Generar un nombre único para evitar colisiones
+        unique_id = str(uuid.uuid4())
+        filename = secure_filename(file.filename)
+        base_name, extension = os.path.splitext(filename)
+        
+        # Nombre para guardar el archivo
+        saved_filename = f"{base_name}_{unique_id}{extension}"
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], saved_filename)
+        
+        # Guardar el archivo
+        file.save(file_path)
+        
+        # Generar resultados
+        try:
+            resultado_nombre = f"{unique_id}"
+            resultado = generar_informe(file_path, True, os.path.join(app.config['OUTPUT_FOLDER'], resultado_nombre))
+            
+            if resultado:
+                return redirect(url_for('resultados', file_id=unique_id, original_name=base_name))
+            else:
+                flash('Error al procesar el archivo. Asegúrate de que tiene el formato correcto.', 'error')
+                return redirect(url_for('index'))
+            
+        except Exception as e:
+            flash(f'Error al procesar el archivo: {str(e)}', 'error')
+            return redirect(url_for('index'))
+    
+    flash('Tipo de archivo no permitido. Solo se aceptan archivos CSV.', 'error')
+    return redirect(url_for('index'))
+
+@app.route('/resultados/<file_id>')
+def resultados(file_id):
+    original_name = request.args.get('original_name', 'archivo')
+    
+    # Verificar que los archivos existan
+    informe_path = os.path.join(app.config['OUTPUT_FOLDER'], f"{file_id}_informe.txt")
+    grafico_path = os.path.join(app.config['OUTPUT_FOLDER'], f"{file_id}_grafico.png")
+    
+    if not os.path.exists(informe_path):
+        flash('No se encontró el informe para este archivo', 'error')
+        return redirect(url_for('index'))
+    
+    # Leer el informe
+    with open(informe_path, 'r') as f:
+        informe_contenido = f.read()
+    
+    # Extraer datos para mostrar en la página
+    lineas = informe_contenido.strip().split('\n')
+    
+    # Buscar totales
+    total_comisiones = "0.00"
+    total_dias = "0"
+    total_transacciones = "0"
+    
+    for linea in lineas:
+        if "Total de comisiones:" in linea:
+            total_comisiones = linea.split(':')[1].strip()
+        elif "Total de días operados:" in linea:
+            total_dias = linea.split(':')[1].strip()
+        elif "Total de transacciones completadas:" in linea:
+            total_transacciones = linea.split(':')[1].strip()
+    
+    # Extraer datos diarios (eliminar cabeceras y pie)
+    datos_diarios = []
+    capturando = False
+    
+    for linea in lineas:
+        if linea == "-----------------":
+            if not capturando:
+                capturando = True
+                continue
+            else:
+                break
+        
+        if capturando and linea and ":" in linea:
+            partes = linea.split(':', 1)
+            if len(partes) == 2:
+                fecha = partes[0].strip()
+                resto = partes[1].strip()
+                if "Transacciones:" in resto:
+                    valor, transacciones_str = resto.split("(", 1)
+                    valor = valor.strip()
+                    transacciones = transacciones_str.replace("Transacciones:", "").replace(")", "").strip()
+                    datos_diarios.append({
+                        'fecha': fecha,
+                        'valor': valor,
+                        'transacciones': transacciones
+                    })
+    
+    # Verificar si existe el gráfico
+    tiene_grafico = os.path.exists(grafico_path)
+    
+    return render_template(
+        'resultados.html',
+        original_name=original_name,
+        file_id=file_id,
+        informe=informe_contenido,
+        total_comisiones=total_comisiones,
+        total_dias=total_dias,
+        total_transacciones=total_transacciones,
+        datos_diarios=datos_diarios,
+        tiene_grafico=tiene_grafico
+    )
+
+@app.route('/descargar/<tipo>/<file_id>')
+def descargar(tipo, file_id):
+    if tipo == 'informe':
+        return send_from_directory(
+            app.config['OUTPUT_FOLDER'],
+            f"{file_id}_informe.txt",
+            as_attachment=True,
+            download_name="informe_comisiones.txt"
+        )
+    elif tipo == 'grafico':
+        return send_from_directory(
+            app.config['OUTPUT_FOLDER'],
+            f"{file_id}_grafico.png",
+            as_attachment=True,
+            download_name="grafico_comisiones.png"
+        )
+    else:
+        return redirect(url_for('index'))
+
+# Nuevas rutas para la calculadora de PNL
+@app.route('/pnl')
+def pnl_calculator():
+    return render_template('pnl_calculator.html')
+
+@app.route('/pnl/upload', methods=['POST'])
+def upload_pnl_files():
+    # Verificar si ambos archivos están presentes
+    if 'file_compras' not in request.files or 'file_ventas' not in request.files:
+        flash('Debes seleccionar ambos archivos CSV: compras y ventas', 'error')
+        return redirect(url_for('pnl_calculator'))
+    
+    file_compras = request.files['file_compras']
+    file_ventas = request.files['file_ventas']
+    
+    # Verificar que ambos archivos tengan nombre
+    if file_compras.filename == '' or file_ventas.filename == '':
+        flash('Debes seleccionar ambos archivos CSV: compras y ventas', 'error')
+        return redirect(url_for('pnl_calculator'))
+    
+    # Verificar que ambos archivos sean del tipo permitido
+    if not (allowed_file(file_compras.filename) and allowed_file(file_ventas.filename)):
+        flash('Tipo de archivo no permitido. Solo se aceptan archivos CSV.', 'error')
+        return redirect(url_for('pnl_calculator'))
+    
+    try:
+        # Generar un ID único para este proceso
+        unique_id = str(uuid.uuid4())
+        
+        # Guardar el archivo de compras
+        filename_compras = secure_filename(file_compras.filename)
+        base_name_compras, extension_compras = os.path.splitext(filename_compras)
+        saved_filename_compras = f"{base_name_compras}_{unique_id}{extension_compras}"
+        file_path_compras = os.path.join(app.config['UPLOAD_FOLDER'], saved_filename_compras)
+        file_compras.save(file_path_compras)
+        
+        # Guardar el archivo de ventas
+        filename_ventas = secure_filename(file_ventas.filename)
+        base_name_ventas, extension_ventas = os.path.splitext(filename_ventas)
+        saved_filename_ventas = f"{base_name_ventas}_{unique_id}{extension_ventas}"
+        file_path_ventas = os.path.join(app.config['UPLOAD_FOLDER'], saved_filename_ventas)
+        file_ventas.save(file_path_ventas)
+        
+        # Generar informe de PNL
+        resultado_nombre = os.path.join(app.config['OUTPUT_FOLDER'], unique_id)
+        resultado = generar_informe_pnl(file_path_compras, file_path_ventas, True, resultado_nombre)
+        
+        if resultado:
+            return redirect(url_for('pnl_resultados', file_id=unique_id))
+        else:
+            flash('Error al procesar los archivos. Asegúrate de que tienen el formato correcto.', 'error')
+            return redirect(url_for('pnl_calculator'))
+        
+    except Exception as e:
+        flash(f'Error al procesar los archivos: {str(e)}', 'error')
+        return redirect(url_for('pnl_calculator'))
+
+@app.route('/pnl/resultados/<file_id>')
+def pnl_resultados(file_id):
+    # Verificar que los archivos existan
+    informe_path = os.path.join(app.config['OUTPUT_FOLDER'], f"{file_id}_informe.txt")
+    grafico_path = os.path.join(app.config['OUTPUT_FOLDER'], f"{file_id}_grafico.png")
+    csv_path = os.path.join(app.config['OUTPUT_FOLDER'], f"{file_id}_informe.csv")
+    
+    if not os.path.exists(informe_path) or not os.path.exists(csv_path):
+        flash('No se encontraron los resultados para estos archivos', 'error')
+        return redirect(url_for('pnl_calculator'))
+    
+    try:
+        # Leer el informe de texto
+        with open(informe_path, 'r') as f:
+            resumen_texto = f.read()
+        
+        # Importar pandas aquí para leer el CSV
+        import pandas as pd
+        resultados_df = pd.read_csv(csv_path)
+        
+        # Convertir la columna de fecha y formatea como string para evitar problemas
+        resultados_df['Fecha'] = pd.to_datetime(resultados_df['Fecha'])
+        resultados_df['Fecha'] = resultados_df['Fecha'].dt.strftime('%Y-%m-%d')
+        
+        # Calcular totales
+        total_pnl_neto = float(resultados_df['PNL Neto'].sum())
+        total_usd_comprado = float(resultados_df['USD Comprado'].sum())
+        total_usd_vendido = float(resultados_df['USD Vendido'].sum())
+        
+        # Recuperar los archivos originales para obtener detalles
+        # Buscar los archivos originales en la carpeta de uploads
+        uploads_path = app.config['UPLOAD_FOLDER']
+        uploaded_files = os.listdir(uploads_path)
+        
+        # Filtrar los archivos que pertenecen a este file_id
+        related_files = [f for f in uploaded_files if file_id in f]
+        compras_file = next((os.path.join(uploads_path, f) for f in related_files if "compra" in f.lower()), None)
+        ventas_file = next((os.path.join(uploads_path, f) for f in related_files if "venta" in f.lower()), None)
+        
+        # Datos detallados para cada día
+        detalles_por_dia = {}
+        
+        if compras_file and ventas_file:
+            # Cargar archivos originales
+            try:
+                # Procesar archivos para obtener datos detallados
+                compras_por_dia = pd.read_csv(compras_file)
+                ventas_por_dia = pd.read_csv(ventas_file)
+                
+                # Intentar convertir valores numéricos
+                for col in compras_por_dia.columns:
+                    if col not in ['Fecha']:
+                        try:
+                            compras_por_dia[col] = pd.to_numeric(compras_por_dia[col], errors='ignore')
+                        except:
+                            pass
+                            
+                # Tratar de colocar valores numéricos en cada columna excepto las de texto
+                for col in ventas_por_dia.columns:
+                    if col not in ['Created Time', 'Status', 'Fiat Type', 'Asset Type', 'Order Type', 'Order Number', 'Couterparty']:
+                        try:
+                            # Para las columnas de comisiones, hacemos un tratamiento especial
+                            if col in ['Maker Fee', 'Taker Fee']:
+                                # Reemplazar comillas vacías con 0
+                                ventas_por_dia[col] = ventas_por_dia[col].astype(str).replace('', '0')
+                                # Encontrar valores específicos como "0.05" y marcarlos
+                                ventas_por_dia[col + '_original'] = ventas_por_dia[col]
+                                # Continuar con la conversión normal
+                                ventas_por_dia[col] = pd.to_numeric(ventas_por_dia[col], errors='coerce').fillna(0)
+                            else:
+                                ventas_por_dia[col] = pd.to_numeric(ventas_por_dia[col], errors='coerce').fillna(0)
+                        except Exception as e:
+                            print(f"Error procesando columna {col}: {e}")
+                
+                # Convertir fechas
+                try:
+                    compras_por_dia['Fecha'] = pd.to_datetime(compras_por_dia['Fecha'], format='%d/%m')
+                    current_year = pd.Timestamp.now().year
+                    compras_por_dia['Fecha'] = compras_por_dia['Fecha'].apply(lambda x: x.replace(year=current_year) if pd.notnull(x) else x)
+                    compras_por_dia['Fecha'] = compras_por_dia['Fecha'].dt.strftime('%Y-%m-%d')
+                except:
+                    # Si hay error, es posible que el formato sea diferente
+                    pass
+                    
+                try:
+                    ventas_por_dia['Fecha'] = pd.to_datetime(ventas_por_dia['Created Time']).dt.date
+                    ventas_por_dia['Fecha'] = pd.to_datetime(ventas_por_dia['Fecha'])
+                    ventas_por_dia['Fecha'] = ventas_por_dia['Fecha'].dt.strftime('%Y-%m-%d')
+                except:
+                    # Si hay error, es posible que el formato sea diferente
+                    pass
+                
+                # Filtrar ventas completadas
+                if 'Status' in ventas_por_dia.columns:
+                    ventas_por_dia = ventas_por_dia[ventas_por_dia['Status'] == 'Completed']
+                    
+                # Diagnóstico: Imprimir algunos valores de Maker Fee y Taker Fee
+                if 'Maker Fee' in ventas_por_dia.columns and 'Taker Fee' in ventas_por_dia.columns:
+                    print("\n=== DIAGNÓSTICO DE COMISIONES ===")
+                    print(f"Tipos de datos en columnas de comisiones:")
+                    print(f"Maker Fee dtype: {ventas_por_dia['Maker Fee'].dtype}")
+                    print(f"Taker Fee dtype: {ventas_por_dia['Taker Fee'].dtype}")
+                    
+                    # Imprimir los primeros 5 valores
+                    print("\nPrimeros 5 valores de comisiones:")
+                    for i, row in ventas_por_dia.head(5).iterrows():
+                        print(f"Índice {i}:")
+                        print(f"  Maker Fee: '{row['Maker Fee']}' (tipo: {type(row['Maker Fee'])})")
+                        print(f"  Taker Fee: '{row['Taker Fee']}' (tipo: {type(row['Taker Fee'])})")
+                        
+                    # Valores únicos
+                    maker_uniques = ventas_por_dia['Maker Fee'].unique()
+                    taker_uniques = ventas_por_dia['Taker Fee'].unique()
+                    print("\nValores únicos en Maker Fee:", maker_uniques)
+                    print("Valores únicos en Taker Fee:", taker_uniques)
+                    print("=== FIN DE DIAGNÓSTICO ===\n")
+                
+                # Generar detalle para cada fecha en resultados_df
+                for _, row in resultados_df.iterrows():
+                    fecha_str = row['Fecha']
+                    
+                    # Detalles de compra de este día
+                    compras_dia = compras_por_dia[compras_por_dia['Fecha'] == fecha_str] if 'Fecha' in compras_por_dia.columns else pd.DataFrame()
+                    
+                    # Detalles de venta de este día
+                    ventas_dia = ventas_por_dia[ventas_por_dia['Fecha'] == fecha_str] if 'Fecha' in ventas_por_dia.columns else pd.DataFrame()
+                    
+                    # Guardar los detalles
+                    detalles_por_dia[fecha_str] = {
+                        'compras': compras_dia.to_dict('records') if not compras_dia.empty else [],
+                        'ventas': ventas_dia.to_dict('records') if not ventas_dia.empty else []
+                    }
+            except Exception as e:
+                print(f"Error al procesar detalles: {e}")
+                # Si hay error en los detalles, continuamos sin ellos
+                detalles_por_dia = {}
+        
+        # Verificar si existe el gráfico
+        tiene_grafico = os.path.exists(grafico_path)
+        
+        return render_template(
+            'pnl_resultados.html',
+            file_id=file_id,
+            resumen_texto=resumen_texto,
+            resultados_df=resultados_df.to_dict('records'),
+            total_pnl_neto=total_pnl_neto,
+            total_usd_comprado=total_usd_comprado,
+            total_usd_vendido=total_usd_vendido,
+            tiene_grafico=tiene_grafico,
+            detalles_por_dia=detalles_por_dia
+        )
+    
+    except Exception as e:
+        flash(f'Error al mostrar los resultados: {str(e)}', 'error')
+        return redirect(url_for('pnl_calculator'))
+
+@app.route('/pnl/descargar/<tipo>/<file_id>')
+def descargar_pnl(tipo, file_id):
+    if tipo == 'informe':
+        return send_from_directory(
+            app.config['OUTPUT_FOLDER'],
+            f"{file_id}_informe.txt",
+            as_attachment=True,
+            download_name="informe_pnl.txt"
+        )
+    elif tipo == 'grafico':
+        return send_from_directory(
+            app.config['OUTPUT_FOLDER'],
+            f"{file_id}_grafico.png",
+            as_attachment=True,
+            download_name="grafico_pnl.png"
+        )
+    elif tipo == 'csv':
+        return send_from_directory(
+            app.config['OUTPUT_FOLDER'],
+            f"{file_id}_informe.csv",
+            as_attachment=True,
+            download_name="informe_pnl.csv"
+        )
+    else:
+        return redirect(url_for('pnl_calculator'))
+
+@app.route('/historial')
+def historial():
+    """Muestra el historial de análisis realizados"""
+    history = get_analysis_history()
+    
+    # Formatear fechas para mostrar
+    import datetime
+    for item in history:
+        if item['fecha']:
+            timestamp = item['fecha']
+            item['fecha_formateada'] = datetime.datetime.fromtimestamp(timestamp).strftime('%d/%m/%Y %H:%M:%S')
+    
+    return render_template('historial.html', history=history)
+
+if __name__ == '__main__':
+    # Configuración para el entorno de producción
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=False) 

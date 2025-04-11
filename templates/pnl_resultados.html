@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resultados PNL - Análisis P2P</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding-top: 2rem;
+            background-color: #f8f9fa;
+        }
+        .main-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+            margin-bottom: 2rem;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 1rem;
+        }
+        .header h1 {
+            color: #0d6efd;
+            font-weight: 600;
+        }
+        .summary-card {
+            background-color: #f1f8ff;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        .summary-item {
+            text-align: center;
+            padding: 1rem;
+        }
+        .summary-value {
+            font-size: 2rem;
+            font-weight: 600;
+            color: #0d6efd;
+        }
+        .positive {
+            color: #198754;
+        }
+        .negative {
+            color: #dc3545;
+        }
+        .summary-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        .result-section {
+            margin-bottom: 2rem;
+        }
+        .result-section h3 {
+            color: #495057;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+            border-bottom: 1px solid #e9ecef;
+            padding-bottom: 0.5rem;
+        }
+        .table {
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        .table thead {
+            background-color: #f8f9fa;
+        }
+        .img-fluid {
+            border-radius: 8px;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        .btn-outline-secondary {
+            margin-right: 0.5rem;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .nav-tabs {
+            margin-bottom: 1.5rem;
+        }
+        .clickable-row {
+            cursor: pointer;
+        }
+        .clickable-row:hover {
+            background-color: #f1f8ff;
+        }
+        .detail-row {
+            display: none;
+            background-color: #f8f9fa;
+        }
+        .detail-container {
+            padding: 20px;
+        }
+        .detail-table {
+            margin-bottom: 1rem;
+        }
+        .detail-title {
+            font-weight: 600;
+            color: #0d6efd;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .transaction-table {
+            font-size: 0.9rem;
+        }
+        .back-top {
+            text-align: right;
+            padding-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container main-container">
+        <div class="header">
+            <h1>Resultados PNL</h1>
+            <p class="lead">Análisis de Ganancias y Pérdidas P2P</p>
+        </div>
+
+        <ul class="nav nav-tabs">
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('index') }}">Calculadora de Comisiones</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('pnl_calculator') }}">Calculadora PNL</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('historial') }}">Historial</a>
+            </li>
+        </ul>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="summary-card">
+            <div class="row">
+                <div class="col-md-4 summary-item">
+                    <div class="summary-value {% if total_pnl_neto >= 0 %}positive{% else %}negative{% endif %}">
+                        {{ '{:,.2f}'.format(total_pnl_neto) }} USD
+                    </div>
+                    <div class="summary-label">PNL Neto Total</div>
+                </div>
+                <div class="col-md-4 summary-item">
+                    <div class="summary-value">{{ '{:,.2f}'.format(total_usd_comprado) }}</div>
+                    <div class="summary-label">Total USD Comprado</div>
+                </div>
+                <div class="col-md-4 summary-item">
+                    <div class="summary-value">{{ '{:,.2f}'.format(total_usd_vendido) }}</div>
+                    <div class="summary-label">Total USD Vendido</div>
+                </div>
+            </div>
+        </div>
+
+        {% if tiene_grafico %}
+        <div class="result-section">
+            <h3>Gráfico de PNL Diario</h3>
+            <img src="{{ url_for('descargar_pnl', tipo='grafico', file_id=file_id) }}" class="img-fluid" alt="Gráfico de PNL">
+        </div>
+        {% endif %}
+
+        <div class="result-section">
+            <h3>Resultados Diarios</h3>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>USD Comprado</th>
+                            <th>Precio Compra</th>
+                            <th>USD Vendido</th>
+                            <th>Precio Venta</th>
+                            <th>Precio Stock</th>
+                            <th>Margen</th>
+                            <th>PNL Bruto</th>
+                            <th>Comisiones</th>
+                            <th>PNL Neto</th>
+                            <th>Remanente USD</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in resultados_df %}
+                        <tr class="clickable-row" data-fecha="{{ row.Fecha }}">
+                            <td>{{ row.Fecha }}</td>
+                            <td>{{ '{:,.2f}'.format(row['USD Comprado']|float) }}</td>
+                            <td>
+                                {% if row['Precio Promedio Compra']|float > 0 %}
+                                    ${{ '{:,.2f}'.format(row['Precio Promedio Compra']|float) }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>{{ '{:,.2f}'.format(row['USD Vendido']|float) }}</td>
+                            <td>
+                                {% if row['Precio Promedio Venta']|float > 0 %}
+                                    ${{ '{:,.2f}'.format(row['Precio Promedio Venta']|float) }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row['Precio Promedio Stock']|float > 0 %}
+                                    ${{ '{:,.2f}'.format(row['Precio Promedio Stock']|float) }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>${{ '{:,.2f}'.format(row['Margen']|float) }}</td>
+                            <td>{{ '{:,.2f}'.format(row['PNL Bruto']|float) }}</td>
+                            <td>{{ '{:,.2f}'.format(row['Comisiones']|float) }}</td>
+                            <td class="{% if row['PNL Neto']|float >= 0 %}positive{% else %}negative{% endif %}">
+                                {{ '{:,.2f}'.format(row['PNL Neto']|float) }}
+                            </td>
+                            <td>{{ '{:,.2f}'.format(row['Remanente USD']|float) }}</td>
+                        </tr>
+                        <tr class="detail-row" id="details-{{ row.Fecha }}">
+                            <td colspan="11">
+                                <div class="detail-container">
+                                    {% set fecha_str = row.Fecha %}
+                                    {% if fecha_str in detalles_por_dia and (detalles_por_dia[fecha_str]['compras'] or detalles_por_dia[fecha_str]['ventas']) %}
+                                        {% if detalles_por_dia[fecha_str]['compras'] %}
+                                        <div class="detail-table">
+                                            <div class="detail-title">
+                                                Compras del día {{ fecha_str }}
+                                            </div>
+                                            <table class="table table-sm transaction-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Monto Cerrado</th>
+                                                        <th>Precio</th>
+                                                        <th>USD Comprado</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for compra in detalles_por_dia[fecha_str]['compras'] %}
+                                                    <tr>
+                                                        <td>
+                                                            {% if 'Monto Cerrado' in compra %}
+                                                                {% if compra['Monto Cerrado'] is string %}
+                                                                    {{ compra['Monto Cerrado'] }}
+                                                                {% else %}
+                                                                    ${{ '{:,.2f}'.format(compra['Monto Cerrado']) }}
+                                                                {% endif %}
+                                                            {% else %}
+                                                                -
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {% if 'Precio' in compra %}
+                                                                {% if compra['Precio'] is string %}
+                                                                    {{ compra['Precio'] }}
+                                                                {% else %}
+                                                                    ${{ '{:,.2f}'.format(compra['Precio']) }}
+                                                                {% endif %}
+                                                            {% else %}
+                                                                -
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {% if 'Monto Cerrado' in compra and 'Precio' in compra %}
+                                                                {% if compra['Monto Cerrado'] is number and compra['Precio'] is number and compra['Precio'] != 0 %}
+                                                                    {{ '{:,.2f}'.format(compra['Monto Cerrado'] / compra['Precio']) }}
+                                                                {% else %}
+                                                                    -
+                                                                {% endif %}
+                                                            {% else %}
+                                                                -
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% if detalles_por_dia[fecha_str]['ventas'] %}
+                                        <div class="detail-table">
+                                            <div class="detail-title">
+                                                Ventas del día {{ fecha_str }}
+                                            </div>
+                                            <table class="table table-sm transaction-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Total Price</th>
+                                                        <th>Price</th>
+                                                        <th>Quantity</th>
+                                                        <th>Comisión</th>
+                                                        <th>Hora</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for venta in detalles_por_dia[fecha_str]['ventas'] %}
+                                                    <tr>
+                                                        <td>
+                                                            {% if 'Total Price' in venta %}
+                                                                {% if venta['Total Price'] is string %}
+                                                                    {{ venta['Total Price'] }}
+                                                                {% else %}
+                                                                    {{ '{:,.2f}'.format(venta['Total Price']) }}
+                                                                {% endif %}
+                                                            {% else %}
+                                                                -
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {% if 'Price' in venta %}
+                                                                {% if venta['Price'] is string %}
+                                                                    {{ venta['Price'] }}
+                                                                {% else %}
+                                                                    {{ '{:,.2f}'.format(venta['Price']) }}
+                                                                {% endif %}
+                                                            {% else %}
+                                                                -
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {% if 'Quantity' in venta %}
+                                                                {% if venta['Quantity'] is string %}
+                                                                    {{ venta['Quantity'] }}
+                                                                {% else %}
+                                                                    {{ '{:,.2f}'.format(venta['Quantity']) }}
+                                                                {% endif %}
+                                                            {% else %}
+                                                                -
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {% set maker_fee = venta['Maker Fee'] if 'Maker Fee' in venta else 0 %}
+                                                            {% set taker_fee = venta['Taker Fee'] if 'Taker Fee' in venta else 0 %}
+                                                            {% if maker_fee is not none and taker_fee is not none %}
+                                                                {% if maker_fee > 0 or taker_fee > 0 %}
+                                                                    {{ '{:,.2f}'.format(maker_fee + taker_fee) }}
+                                                                {% else %}
+                                                                    {% if venta['Taker Fee'] == "0.05" or venta['Taker Fee'] == 0.05 %}
+                                                                        0.05
+                                                                    {% else %}
+                                                                        {{ "{:,.2f}".format(0) }}
+                                                                    {% endif %}
+                                                                {% endif %}
+                                                            {% else %}
+                                                                {% if 'Taker Fee' in venta and venta['Taker Fee'] %}
+                                                                    {{ venta['Taker Fee'] }}
+                                                                {% elif 'Maker Fee' in venta and venta['Maker Fee'] %}
+                                                                    {{ venta['Maker Fee'] }}
+                                                                {% else %}
+                                                                    0.00
+                                                                {% endif %}
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>{{ venta['Created Time'].split(' ')[1] if 'Created Time' in venta and venta['Created Time'] is string else '-' }}</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        <div class="back-top">
+                                            <button class="btn btn-sm btn-outline-secondary close-details">Cerrar Detalles</button>
+                                        </div>
+                                    {% else %}
+                                        <div class="alert alert-info">
+                                            No hay detalles disponibles para este día.
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="result-section">
+            <h3>Resumen de PNL</h3>
+            <pre>{{ resumen_texto }}</pre>
+        </div>
+
+        <div class="d-flex justify-content-between">
+            <div>
+                <a href="{{ url_for('descargar_pnl', tipo='informe', file_id=file_id) }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-download"></i> Descargar Informe (TXT)
+                </a>
+                <a href="{{ url_for('descargar_pnl', tipo='csv', file_id=file_id) }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-download"></i> Descargar CSV
+                </a>
+                {% if tiene_grafico %}
+                <a href="{{ url_for('descargar_pnl', tipo='grafico', file_id=file_id) }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-download"></i> Descargar Gráfico
+                </a>
+                {% endif %}
+            </div>
+            <a href="{{ url_for('pnl_calculator') }}" class="btn btn-primary">
+                <i class="bi bi-arrow-left"></i> Volver a la Calculadora
+            </a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            // Click en fila para mostrar detalles
+            $('.clickable-row').click(function() {
+                var fecha = $(this).data('fecha');
+                $('#details-' + fecha).toggle();
+            });
+            
+            // Cerrar detalles al hacer clic en el botón
+            $('.close-details').click(function(e) {
+                e.stopPropagation();
+                $(this).closest('.detail-row').hide();
+            });
+        });
+    </script>
+</body>
+</html> 

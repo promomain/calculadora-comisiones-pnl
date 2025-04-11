@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Informe Técnico: Calculadora de Comisiones y PNL</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        h1 {
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            border-bottom: 1px solid #bdc3c7;
+            padding-bottom: 5px;
+            margin-top: 30px;
+        }
+        .container {
+            margin-bottom: 40px;
+        }
+        code {
+            background-color: #f8f8f8;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: 'Courier New', Courier, monospace;
+            color: #e74c3c;
+        }
+        pre {
+            background-color: #f8f8f8;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: 'Courier New', Courier, monospace;
+            border: 1px solid #ddd;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .formula {
+            background-color: #f0f7fd;
+            border-left: 5px solid #3498db;
+            padding: 10px 15px;
+            margin: 15px 0;
+        }
+        .diagram {
+            margin: 30px 0;
+            text-align: center;
+        }
+        .flow-diagram {
+            display: inline-block;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .highlight {
+            background-color: #ffffcc;
+            padding: 2px;
+        }
+        .note {
+            background-color: #fff8dc;
+            border-left: 4px solid #f1c40f;
+            padding: 10px 15px;
+            margin: 15px 0;
+        }
+        .component {
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .function-header {
+            background-color: #eaf2f8;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Informe Técnico: Sistema de Calculadora de Comisiones y PNL</h1>
+        <p>Este documento proporciona un análisis detallado de la metodología, arquitectura y fórmulas utilizadas en el sistema de cálculo de PNL (Profit and Loss).</p>
+    </header>
+
+    <div class="container">
+        <h2>1. Arquitectura General del Sistema</h2>
+        <p>El sistema está diseñado como una aplicación web Flask que permite a los usuarios cargar archivos CSV para calcular comisiones y PNL (Profit and Loss) en operaciones financieras. La arquitectura se divide en los siguientes componentes principales:</p>
+        
+        <div class="component">
+            <h3>1.1 Componentes Principales</h3>
+            <ul>
+                <li><strong>Aplicación Web (app.py)</strong>: Interfaz de usuario con formularios para subir archivos CSV y visualizar resultados.</li>
+                <li><strong>Calculadora de Comisiones (comisiones_flexible.py)</strong>: Procesa archivos CSV para calcular comisiones por día.</li>
+                <li><strong>Calculadora de PNL (pnl_calculator.py)</strong>: Procesa archivos de compras y ventas para calcular el PNL.</li>
+                <li><strong>Plantillas HTML</strong>: Interfaz gráfica para visualización de resultados.</li>
+                <li><strong>Generación de Gráficos</strong>: Visualización de datos mediante matplotlib.</li>
+            </ul>
+        </div>
+
+        <div class="diagram">
+            <h3>1.2 Diagrama de Arquitectura</h3>
+            <div class="flow-diagram">
+                <pre>
+┌──────────────────┐                 ┌───────────────────────┐
+│   Interfaz Web   │                 │  Almacenamiento       │
+│    (Flask)       │ ◄──────────────►│    (Archivos)         │
+└────────┬─────────┘                 └───────────────────────┘
+         │                                       ▲
+         ▼                                       │
+┌─────────────────────────────────────────────┐ │
+│              Procesamiento                  │ │
+├─────────────────┬───────────────────────────┤ │
+│ Calculadora de  │    Calculadora de         │ │
+│  Comisiones     │         PNL               │ │
+└─────────────────┴───────────────┬───────────┘ │
+                                  │             │
+                                  ▼             │
+                   ┌──────────────────────────┐ │
+                   │ Generación de Informes   │ │
+                   │ y Visualizaciones        │─┘
+                   └──────────────────────────┘
+                </pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>2. Flujo de Datos y Procesamiento</h2>
+        
+        <h3>2.1 Flujo General</h3>
+        <ol>
+            <li>El usuario carga archivos CSV de compras y ventas a través de la interfaz web.</li>
+            <li>Los archivos se almacenan temporalmente con nombres únicos en el servidor.</li>
+            <li>Los datos se procesan utilizando pandas para extraer información relevante.</li>
+            <li>Se realizan cálculos de PNL combinando datos de compras y ventas.</li>
+            <li>Se generan informes en formato texto, CSV y gráficos visuales.</li>
+            <li>Los resultados se muestran en la interfaz web y están disponibles para descarga.</li>
+        </ol>
+
+        <div class="diagram">
+            <h3>2.2 Diagrama de Flujo de Datos</h3>
+            <div class="flow-diagram">
+                <pre>
+[Archivo CSV Compras] ───► [procesar_archivo_compras] ───► [DataFrame Compras]
+                                                              │
+                                                              ▼
+[Archivo CSV Ventas]  ───► [procesar_archivo_ventas]  ───► [DataFrame Ventas]
+                                                              │
+                                                              ▼
+                                                      [calcular_pnl_diario]
+                                                              │
+                              ┌──────────────────────────────┬─────────────────┐
+                              ▼                              ▼                 ▼
+                   [Informe Texto (.txt)]        [Datos CSV (.csv)]     [Gráfico (.png)]
+                </pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>3. Procesamiento de Datos de Compras</h2>
+        
+        <h3>3.1 Función Principal</h3>
+        <div class="function-header">procesar_archivo_compras(archivo_csv)</div>
+        <p>Esta función se encarga de procesar el archivo CSV de compras y retornar un DataFrame con las compras agrupadas por día.</p>
+        
+        <h3>3.2 Pasos del Procesamiento</h3>
+        <ol>
+            <li>Lee el archivo CSV con precisión numérica completa (<code>float_precision='high'</code>).</li>
+            <li>Convierte columnas monetarias eliminando símbolos (<code>$</code> y <code>,</code>) y las transforma a tipo float.</li>
+            <li>Calcula los USD comprados dividiendo el monto cerrado entre el precio.</li>
+            <li>Convierte la fecha a formato estándar y asigna el año actual si no está especificado.</li>
+            <li>Agrupa los datos por fecha, sumando el monto cerrado y USD comprados.</li>
+            <li>Calcula el precio promedio de compra para cada día.</li>
+        </ol>
+
+        <div class="formula">
+            <h4>Fórmulas Clave:</h4>
+            <ul>
+                <li><strong>USD Comprado</strong> = Monto Cerrado / Precio</li>
+                <li><strong>Precio Promedio Compra</strong> = Suma(Monto Cerrado) / Suma(USD Comprado)</li>
+            </ul>
+        </div>
+
+        <pre>
+# Código simplificado
+df['USD Comprado'] = df['Monto Cerrado'] / df['Precio']
+
+compras_por_dia = df.groupby('Fecha').agg({
+    'Monto Cerrado': 'sum',
+    'USD Comprado': 'sum'
+}).reset_index()
+
+compras_por_dia['Precio Promedio Compra'] = compras_por_dia['Monto Cerrado'] / compras_por_dia['USD Comprado']
+        </pre>
+    </div>
+
+    <div class="container">
+        <h2>4. Procesamiento de Datos de Ventas</h2>
+        
+        <h3>4.1 Función Principal</h3>
+        <div class="function-header">procesar_archivo_ventas(archivo_csv)</div>
+        <p>Esta función procesa el archivo CSV de ventas y retorna un DataFrame con las ventas agrupadas por día.</p>
+        
+        <h3>4.2 Pasos del Procesamiento</h3>
+        <ol>
+            <li>Lee el archivo CSV con precisión numérica completa.</li>
+            <li>Filtra solo las transacciones con estado "Completed".</li>
+            <li>Convierte columnas monetarias a tipo float.</li>
+            <li>Calcula el "Valor Real" multiplicando Precio × Cantidad para cada transacción.</li>
+            <li>Procesa las columnas de comisiones y maneja valores vacíos.</li>
+            <li>Extrae la fecha del campo "Created Time".</li>
+            <li>Agrupa los datos por fecha, sumando valor real, cantidad y comisiones.</li>
+            <li>Calcula el precio promedio de venta para cada día.</li>
+        </ol>
+
+        <div class="formula">
+            <h4>Fórmulas Clave:</h4>
+            <ul>
+                <li><strong>Valor Real</strong> = Precio × Cantidad</li>
+                <li><strong>Comisiones Totales</strong> = Maker Fee + Taker Fee</li>
+                <li><strong>Precio Promedio Venta</strong> = Suma(Valor Real) / Suma(Cantidad)</li>
+            </ul>
+        </div>
+
+        <pre>
+# Código simplificado
+df['Valor Real'] = df['Price'] * df['Quantity']
+df['Comisiones'] = df['Maker Fee'] + df['Taker Fee']
+
+ventas_por_dia = df.groupby('Fecha').agg({
+    'Valor Real': 'sum',
+    'Quantity': 'sum',
+    'Comisiones': 'sum'
+}).reset_index()
+
+ventas_por_dia['Precio Promedio Venta'] = ventas_por_dia['Valor Real'] / ventas_por_dia['Quantity']
+        </pre>
+    </div>
+
+    <div class="container">
+        <h2>5. Cálculo del PNL (Profit and Loss)</h2>
+        
+        <h3>5.1 Función Principal</h3>
+        <div class="function-header">calcular_pnl_diario(compras_df, ventas_df)</div>
+        <p>Esta función combina los datos de compras y ventas para calcular el PNL diario utilizando un método FIFO adaptado con precio promedio ponderado.</p>
+        
+        <h3>5.2 Metodología de Cálculo</h3>
+        <p>El sistema utiliza un enfoque de <strong>precio promedio ponderado</strong> para el inventario, donde:</p>
+        <ul>
+            <li>Se mantiene un registro del USD remanente (stock disponible).</li>
+            <li>Cuando hay nuevas compras, se actualiza el precio promedio ponderado del stock.</li>
+            <li>Para las ventas, se utiliza el precio promedio actual del stock para calcular el margen.</li>
+            <li>Las comisiones se restan directamente del PNL bruto para obtener el PNL neto.</li>
+        </ul>
+
+        <div class="note">
+            <strong>Nota importante:</strong> El sistema implementa un método FIFO (First In, First Out) adaptado, donde los USD comprados primero son los primeros en considerarse vendidos, pero utilizando un precio promedio ponderado para el stock disponible.
+        </div>
+
+        <h3>5.3 Flujo del Algoritmo</h3>
+        <ol>
+            <li>Crear una lista de todas las fechas únicas de compras y ventas ordenadas.</li>
+            <li>Inicializar variables para rastrear el remanente de USD y su valor monetario.</li>
+            <li>Para cada día en orden cronológico:
+                <ul>
+                    <li>Agregar compras nuevas al stock disponible.</li>
+                    <li>Calcular el nuevo precio promedio ponderado del stock.</li>
+                    <li>Procesar ventas del día (si existen).</li>
+                    <li>Calcular margen y PNL basado en la diferencia entre precio de venta y precio promedio del stock.</li>
+                    <li>Actualizar el remanente de USD y su valor monetario.</li>
+                </ul>
+            </li>
+            <li>Acumular el PNL neto total de todos los días.</li>
+        </ol>
+
+        <div class="formula">
+            <h4>Fórmulas Clave para el Cálculo de PNL:</h4>
+            <ul>
+                <li><strong>Stock Disponible</strong> = Remanente Anterior + USD Comprado Hoy</li>
+                <li><strong>Precio Promedio Stock</strong> = (Remanente Anterior × Precio Promedio Anterior + Monto Comprado Hoy) / Stock Disponible</li>
+                <li><strong>Margen</strong> = Precio Promedio Venta - Precio Promedio Stock</li>
+                <li><strong>PNL Bruto (CLP)</strong> = Margen × USD Vendido</li>
+                <li><strong>PNL Bruto (USD)</strong> = PNL Bruto (CLP) / Precio Promedio Stock</li>
+                <li><strong>PNL Neto (USD)</strong> = PNL Bruto (USD) - Comisiones</li>
+                <li><strong>Remanente USD</strong> = Stock Disponible - USD Vendido - Comisiones</li>
+            </ul>
+        </div>
+
+        <pre>
+# Código simplificado para el cálculo de PNL diario
+stock_disponible = remanente_usd + usd_comprado_hoy
+if stock_disponible > 0:
+    precio_promedio_stock = (remanente_monto + monto_comprado_hoy) / stock_disponible
+
+# Cuando hay ventas
+if usd_vendido_hoy > 0 and stock_disponible > 0:
+    usd_vendido_efectivo = min(usd_vendido_hoy, stock_disponible)
+    margen = precio_venta_hoy - precio_promedio_stock
+    pnl_bruto_clp = margen * usd_vendido_efectivo
+    pnl_bruto_usd = pnl_bruto_clp / precio_promedio_stock
+    pnl_neto_usd = pnl_bruto_usd - comisiones_hoy
+    
+    # Actualizar remanente
+    remanente_usd = stock_disponible - usd_vendido_efectivo - comisiones_hoy
+    remanente_monto = remanente_usd * precio_promedio_stock
+        </pre>
+    </div>
+
+    <div class="container">
+        <h2>6. Generación de Informes y Visualizaciones</h2>
+        
+        <h3>6.1 Informe de Texto</h3>
+        <p>Se genera un informe detallado en formato texto que incluye:</p>
+        <ul>
+            <li>Resumen diario de compras y ventas.</li>
+            <li>Precios promedio de compra y venta por día.</li>
+            <li>Márgenes, PNL bruto, comisiones y PNL neto por día.</li>
+            <li>Remanente de USD después de cada día.</li>
+            <li>PNL neto total acumulado.</li>
+        </ul>
+
+        <h3>6.2 Informe CSV</h3>
+        <p>Se genera un archivo CSV con todos los datos calculados, incluyendo:</p>
+        <table>
+            <tr>
+                <th>Columna</th>
+                <th>Descripción</th>
+            </tr>
+            <tr>
+                <td>Fecha</td>
+                <td>Fecha de la operación</td>
+            </tr>
+            <tr>
+                <td>USD Comprado</td>
+                <td>Cantidad de USD comprados en el día</td>
+            </tr>
+            <tr>
+                <td>Monto Compra</td>
+                <td>Monto total de la compra en moneda local</td>
+            </tr>
+            <tr>
+                <td>Precio Promedio Compra</td>
+                <td>Precio promedio de compra del día</td>
+            </tr>
+            <tr>
+                <td>USD Vendido</td>
+                <td>Cantidad de USD vendidos en el día</td>
+            </tr>
+            <tr>
+                <td>Monto Venta</td>
+                <td>Monto total de la venta en moneda local</td>
+            </tr>
+            <tr>
+                <td>Precio Promedio Venta</td>
+                <td>Precio promedio de venta del día</td>
+            </tr>
+            <tr>
+                <td>Precio Promedio Stock</td>
+                <td>Precio promedio ponderado del stock disponible</td>
+            </tr>
+            <tr>
+                <td>Margen</td>
+                <td>Diferencia entre precio de venta y precio de stock</td>
+            </tr>
+            <tr>
+                <td>PNL Bruto</td>
+                <td>Beneficio bruto en USD antes de comisiones</td>
+            </tr>
+            <tr>
+                <td>Comisiones</td>
+                <td>Total de comisiones pagadas en USD</td>
+            </tr>
+            <tr>
+                <td>PNL Neto</td>
+                <td>Beneficio neto en USD después de comisiones</td>
+            </tr>
+            <tr>
+                <td>Remanente USD</td>
+                <td>USD disponibles después de operaciones del día</td>
+            </tr>
+            <tr>
+                <td>Precio Promedio Remanente</td>
+                <td>Precio promedio del remanente de USD</td>
+            </tr>
+        </table>
+
+        <h3>6.3 Visualización Gráfica</h3>
+        <p>Se genera un gráfico de barras que muestra:</p>
+        <ul>
+            <li>PNL neto diario con barras verdes (ganancias) y rojas (pérdidas).</li>
+            <li>Valores numéricos sobre cada barra para fácil referencia.</li>
+            <li>Título, etiquetas de ejes y formato adecuado para facilitar la interpretación.</li>
+        </ul>
+    </div>
+
+    <div class="container">
+        <h2>7. Consideraciones Técnicas Importantes</h2>
+        
+        <h3>7.1 Precisión Numérica</h3>
+        <p>El sistema está diseñado para mantener alta precisión en cálculos financieros:</p>
+        <ul>
+            <li>Utilización de <code>float_precision='high'</code> en la lectura de CSV para mantener precisión completa.</li>
+            <li>Evitar redondeos en cálculos intermedios para prevenir errores acumulativos.</li>
+            <li>Realizar redondeo solo en la presentación final de datos (2 decimales).</li>
+        </ul>
+
+        <h3>7.2 Manejo de Errores</h3>
+        <p>El sistema implementa manejo de errores robusto:</p>
+        <ul>
+            <li>Verificación de existencia de columnas necesarias en los archivos CSV.</li>
+            <li>Manejo de valores vacíos o no numéricos en columnas de comisiones.</li>
+            <li>Prevención de divisiones por cero en el cálculo de precios promedio.</li>
+            <li>Validación de que no se vendan más USD de los disponibles.</li>
+        </ul>
+
+        <h3>7.3 Dependencias Externas</h3>
+        <p>El sistema depende de las siguientes bibliotecas principales:</p>
+        <ul>
+            <li><strong>Flask</strong>: Para la interfaz web.</li>
+            <li><strong>Pandas</strong>: Para el procesamiento y manipulación de datos.</li>
+            <li><strong>Matplotlib</strong>: Para la generación de gráficos.</li>
+            <li><strong>NumPy</strong>: Para cálculos numéricos de precisión.</li>
+        </ul>
+    </div>
+
+    <div class="container">
+        <h2>8. Posibles Mejoras y Consideraciones Futuras</h2>
+        
+        <h3>8.1 Mejoras Potenciales</h3>
+        <ul>
+            <li><strong>Optimización de rendimiento</strong> para archivos CSV muy grandes mediante procesamiento por lotes.</li>
+            <li><strong>Interfaz de usuario mejorada</strong> con filtros y opciones de visualización adicionales.</li>
+            <li><strong>Soporte para diferentes métodos de contabilidad de inventario</strong> (LIFO, Promedio Ponderado, etc.).</li>
+            <li><strong>Exportación a formatos adicionales</strong> como Excel o PDF con formato mejorado.</li>
+            <li><strong>Almacenamiento de históricos</strong> para comparar resultados entre diferentes períodos.</li>
+        </ul>
+
+        <h3>8.2 Consideraciones para Implementaciones Específicas</h3>
+        <p>Al adaptar este sistema a casos de uso específicos, considere:</p>
+        <ul>
+            <li>Ajustes en el formato de los archivos CSV de entrada para acomodar diferentes fuentes de datos.</li>
+            <li>Modificaciones en el cálculo del PNL para cumplir con requisitos contables específicos.</li>
+            <li>Adaptaciones para manejar diferentes monedas o pares de trading.</li>
+            <li>Integración con sistemas contables o plataformas de trading existentes.</li>
+        </ul>
+    </div>
+
+    <footer>
+        <hr>
+        <p><em>Este informe ha sido generado automáticamente basado en el análisis del código fuente del sistema de calculadora de PNL.</em></p>
+        <p><strong>Fecha de generación:</strong> <span id="fecha-generacion"></span></p>
+        <script>
+            document.getElementById('fecha-generacion').textContent = new Date().toLocaleString('es-ES');
+        </script>
+    </footer>
+</body>
+</html> 
