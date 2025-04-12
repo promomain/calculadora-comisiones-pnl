@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calculadora de Comisiones</title>
+    <title>Calculadora de Comisiones y PNL - Inicio</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -25,63 +25,115 @@
             margin-bottom: 2rem;
         }
         .header h1 {
-            color: #0d6efd;
+            color: #4CAF50;
             font-weight: 600;
-        }
-        .upload-section {
-            background-color: #f1f8ff;
-            padding: 2rem;
-            border-radius: 8px;
-            border: 1px dashed #0d6efd;
-        }
-        .form-label {
-            font-weight: 500;
-        }
-        .btn-primary {
-            background-color: #0d6efd;
-            border: none;
-            padding: 0.5rem 1.5rem;
-        }
-        .btn-primary:hover {
-            background-color: #0b5ed7;
-        }
-        .instructions {
-            margin-top: 2rem;
-            padding: 1rem;
-            background-color: #f8f9fa;
-            border-radius: 8px;
-        }
-        .instructions h3 {
-            color: #6c757d;
-            font-size: 1.2rem;
-            margin-bottom: 1rem;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+            display: inline-block;
         }
         .alert {
             margin-bottom: 1.5rem;
         }
-        .nav-tabs {
+        .card {
             margin-bottom: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            border: none;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.2);
+        }
+        .card-title {
+            color: #4CAF50;
+            font-weight: 600;
+        }
+        .menu-cards {
+            margin-top: 2rem;
+        }
+        .btn {
+            padding: 0.5rem 1.5rem;
+            border: none;
+            border-radius: 5px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .btn-primary {
+            background-color: #4CAF50;
+        }
+        .btn-primary:hover {
+            background-color: #45a049;
+        }
+        .btn-warning {
+            background-color: #ff9800;
+        }
+        .btn-warning:hover {
+            background-color: #e68a00;
+        }
+        .btn-secondary {
+            background-color: #607d8b;
+        }
+        .btn-secondary:hover {
+            background-color: #546e7a;
+        }
+        
+        /* Menú de navegación moderno */
+        .nav-menu {
+            background-color: #333;
+            overflow: hidden;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+        }
+        
+        .nav-menu a {
+            float: left;
+            display: block;
+            color: white;
+            text-align: center;
+            padding: 14px 20px;
+            text-decoration: none;
+            transition: background-color 0.3s, color 0.3s;
+            font-weight: 500;
+        }
+        
+        .nav-menu a:hover {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .nav-menu a.active {
+            background-color: #4CAF50;
+            color: white;
+            font-weight: bold;
+            box-shadow: inset 0 -3px 0 rgba(255,255,255,0.5);
         }
     </style>
 </head>
 <body>
     <div class="container main-container">
         <div class="header">
-            <h1>Calculadora de Comisiones</h1>
-            <p class="lead">Analiza tus comisiones de operaciones completadas a partir de archivos CSV</p>
+            <h1>Calculadora de Comisiones y PNL</h1>
+            <p class="lead">Herramientas para análisis financiero P2P</p>
         </div>
 
-        <ul class="nav nav-tabs">
-            <li class="nav-item">
-                <a class="nav-link active" href="{{ url_for('index') }}">Calculadora de Comisiones</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('pnl_calculator') }}">Calculadora PNL</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('historial') }}">Historial</a>
-            </li>
-        </ul>
+        <!-- Menú de navegación -->
+        <div class="nav-menu">
+            <a href="/" class="active">Inicio</a>
+            <a href="/comisiones">Comisiones</a>
+            <a href="/pnl">Calculadora PnL</a>
+            <a href="/comparador">Comparador P2P</a>
+            <a href="/historial">Historial</a>
+        </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -94,35 +146,46 @@
             {% endif %}
         {% endwith %}
 
-        <div class="upload-section">
-            <form method="POST" action="{{ url_for('upload_file') }}" enctype="multipart/form-data">
-                <div class="mb-3">
-                    <label for="formFile" class="form-label">Selecciona tu archivo CSV con datos de comisiones</label>
-                    <input class="form-control" type="file" id="formFile" name="file" accept=".csv">
-                    <div class="form-text">El archivo debe contener columnas de Maker Fee, Taker Fee, Created Time y Status.</div>
+        <div class="row menu-cards">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Calculadora de Comisiones</h5>
+                        <p class="card-text">Analiza tus comisiones de operaciones completadas a partir de archivos CSV.</p>
+                        <a href="{{ url_for('comisiones') }}" class="btn btn-primary">Ir a Comisiones</a>
+                    </div>
                 </div>
-                <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-primary">Analizar Comisiones</button>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Calculadora de PNL</h5>
+                        <p class="card-text">Analiza tus ganancias y pérdidas en operaciones P2P.</p>
+                        <a href="{{ url_for('pnl_calculator') }}" class="btn btn-primary">Ir a PNL</a>
+                    </div>
                 </div>
-            </form>
-        </div>
-
-        <div class="instructions">
-            <h3>Cómo usar esta herramienta</h3>
-            <ol>
-                <li>Sube un archivo CSV que contenga tus transacciones con comisiones.</li>
-                <li>El archivo debe incluir al menos las columnas:
-                    <ul>
-                        <li><strong>Maker Fee</strong> - Comisiones como maker</li>
-                        <li><strong>Taker Fee</strong> - Comisiones como taker</li>
-                        <li><strong>Created Time</strong> - Fecha y hora de la transacción</li>
-                        <li><strong>Status</strong> - Estado de la transacción (solo se procesan las "Completed")</li>
-                    </ul>
-                </li>
-                <li>El sistema generará un informe detallado y un gráfico de tus comisiones agrupadas por día.</li>
-                <li>Podrás descargar tanto el informe como el gráfico para tu uso personal.</li>
-                <li><strong>Nota importante:</strong> Solo se consideran las transacciones con estado "Completed".</li>
-            </ol>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Comparador P2P vs Mercado</h5>
+                        <p class="card-text">Compara en tiempo real los precios del P2P de Binance con el mercado general.</p>
+                        <a href="{{ url_for('comparador_p2p') }}" class="btn btn-warning">Ir al Comparador</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Historial de Análisis</h5>
+                        <p class="card-text">Accede a los análisis anteriores y resultados guardados.</p>
+                        <a href="{{ url_for('historial') }}" class="btn btn-secondary">Ver Historial</a>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comparador Binance P2P vs Mercado</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .card { background: white; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); transition: box-shadow 0.3s; }
+        .card:hover { box-shadow: 0 6px 15px rgba(0,0,0,0.15); }
+        .chart-container { width: 100%; height: 500px; margin-bottom: 30px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr; gap: 30px; }
+        .flex { display: flex; justify-content: space-between; align-items: center; }
+        .value { font-size: 26px; font-weight: bold; }
+        .label { font-size: 14px; color: #666; }
+        .up { color: #4caf50; }
+        .down { color: #f44336; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f2f2f2; }
+        .tabs { display: flex; margin-bottom: 10px; }
+        .tab { padding: 10px 20px; cursor: pointer; border-radius: 5px 5px 0 0; background-color: #eee; margin-right: 5px; }
+        .tab.active { background-color: white; border-bottom: 2px solid #4CAF50; }
+        .alert { background-color: #ffe0e0; padding: 10px; border-radius: 5px; color: #d32f2f; margin-bottom: 10px; }
+        .hidden { display: none; }
+        button { 
+            background-color: #4CAF50; 
+            color: white; 
+            border: none; 
+            padding: 10px 18px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.3s, transform 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        button:hover {
+            background-color: #45a049;
+            transform: translateY(-2px);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        input {
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-right: 10px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            font-family: inherit;
+        }
+        input:focus {
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.25);
+            outline: none;
+        }
+        .strategy-card {
+            border-left: 5px solid #4CAF50;
+            background-color: #f8f8f8;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+        }
+        .strategy-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .margin-positive {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        .margin-negative {
+            color: #f44336;
+            font-weight: bold;
+        }
+        .margin-neutral {
+            color: #757575;
+        }
+        
+        /* Estilos mejorados para destacar los márgenes */
+        .value.margin-positive {
+            color: white;
+            background-color: #4CAF50;
+            padding: 5px 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .value.margin-negative {
+            color: white;
+            background-color: #f44336;
+            padding: 5px 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        /* Animar cambios en los valores */
+        .value {
+            transition: all 0.3s ease;
+        }
+        
+        /* Destacar sección de márgenes */
+        #margenCompraGrande, #margenPersonalizadoGrande {
+            font-size: 30px;
+            text-align: center;
+        }
+        
+        /* Destacar precios */
+        #precioMercado, #precioP2PCompra, #precioP2PVenta {
+            font-size: 30px;
+            margin-top: 10px;
+        }
+        
+        /* Mejorar alineación vertical */
+        .precios-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            height: 100%;
+        }
+        
+        /* Centrar precio mercado verticalmente */
+        .precio-mercado-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            height: 100%;
+        }
+        
+        /* Menú de navegación */
+        .nav-menu {
+            background-color: #333;
+            overflow: hidden;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+        }
+        
+        .nav-menu a {
+            float: left;
+            display: block;
+            color: white;
+            text-align: center;
+            padding: 14px 20px;
+            text-decoration: none;
+            transition: background-color 0.3s, color 0.3s;
+            font-weight: 500;
+        }
+        
+        .nav-menu a:hover {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .nav-menu a.active {
+            background-color: #4CAF50;
+            color: white;
+            font-weight: bold;
+            box-shadow: inset 0 -3px 0 rgba(255,255,255,0.5);
+        }
+        
+        /* Estilos para la última actualización */
+        .update-info {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .update-time {
+            margin-right: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        h1, h2, h3 {
+            font-weight: 500;
+            color: #333;
+        }
+        
+        h1 {
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+            display: inline-block;
+        }
+    </style>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Comparador Binance P2P vs Mercado</h1>
+        
+        <!-- Menú de navegación -->
+        <div class="nav-menu">
+            <a href="/">Inicio</a>
+            <a href="/comisiones">Comisiones</a>
+            <a href="/pnl">Calculadora PnL</a>
+            <a href="/comparador" class="active">Comparador P2P</a>
+            <a href="/historial">Historial</a>
+        </div>
+        
+        <div class="card">
+            <div class="flex">
+                <h2>Precios Actuales</h2>
+                <div class="update-info">
+                    <span class="update-time">Última actualización: <span id="timestamp">Cargando...</span></span>
+                    <button onclick="actualizarDatos()">Actualizar Datos</button>
+                </div>
+            </div>
+            
+            <div id="alertaContainer" class="alert hidden">
+                <strong>¡ALERTA!</strong> <span id="alertaTexto"></span>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+                <!-- Columna izquierda: precio mercado -->
+                <div class="precio-mercado-container">
+                    <p class="label">Precio Mercado (Oficial)</p>
+                    <p class="value" id="precioMercado">Cargando...</p>
+                </div>
+                
+                <!-- Columna central: precios P2P -->
+                <div class="precios-container">
+                    <div style="margin-bottom: 20px;">
+                        <p class="label">Precio P2P (Compra USDT)</p>
+                        <p class="value" id="precioP2PCompra">Cargando...</p>
+                    </div>
+                    <div>
+                        <p class="label">Precio P2P (Venta USDT)</p>
+                        <p class="value" id="precioP2PVenta">Cargando...</p>
+                    </div>
+                </div>
+                
+                <!-- Columna derecha: márgenes -->
+                <div>
+                    <div style="margin-bottom: 20px;">
+                        <p class="label">Margen Compra</p>
+                        <p class="value" id="margenCompraGrande">Cargando...</p>
+                    </div>
+                    <div style="margin-bottom: 20px;">
+                        <p class="label">Precio Personalizado</p>
+                        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <input type="number" id="precioPersonalizado" placeholder="Ingresa tu precio de compra (CLP)" style="width: 100%;">
+                            <button onclick="actualizarPrecioPersonalizado()">Calcular</button>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="label">Margen Personalizado</p>
+                        <p class="value" id="margenPersonalizadoGrande">No disponible</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>Gráficos de Precios y Márgenes</h2>
+            
+            <div class="tabs">
+                <div class="tab active" onclick="cambiarIntervalo('1h')">Últimas 24 Horas</div>
+                <div class="tab" onclick="cambiarIntervalo('1d')">Últimos 7 Días</div>
+                <div class="tab" onclick="cambiarIntervalo('all')">Histórico Completo</div>
+            </div>
+            
+            <div class="grid-2">
+                <div>
+                    <h3>Precios</h3>
+                    <div id="preciosChart" class="chart-container"></div>
+                </div>
+                <div>
+                    <h3>Margen de Compra</h3>
+                    <div id="margenesChart" class="chart-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let intervaloActual = '1h';
+        
+        function actualizarDatos() {
+            fetch('/api/comparador/actualizar', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    cargarDatos();
+                } else {
+                    console.error('Error al actualizar datos:', data.error);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+        
+        function actualizarPrecioPersonalizado() {
+            const precioPersonalizado = document.getElementById('precioPersonalizado').value;
+            if (!precioPersonalizado || isNaN(precioPersonalizado) || parseFloat(precioPersonalizado) <= 0) {
+                alert('Por favor ingresa un precio válido');
+                return;
+            }
+            
+            fetch('/api/comparador/precio-personalizado', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ precio: parseFloat(precioPersonalizado) })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Precio personalizado actualizado correctamente');
+                    cargarDatos();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error al actualizar el precio personalizado');
+            });
+        }
+        
+        function cargarDatos() {
+            // Usar directamente el endpoint principal del comparador que devuelve los datos más recientes
+            fetch('/api/comparador')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Error en la respuesta del servidor: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("Datos recibidos:", data); // Para depuración
+                
+                // Actualizar sección de precios
+                document.getElementById('precioMercado').textContent = data.precio_mercado ? data.precio_mercado.toFixed(2) + ' CLP' : 'No disponible';
+                document.getElementById('precioP2PCompra').textContent = data.precio_p2p_compra ? data.precio_p2p_compra.toFixed(2) + ' CLP' : 'No disponible';
+                document.getElementById('precioP2PVenta').textContent = data.precio_p2p_venta ? data.precio_p2p_venta.toFixed(2) + ' CLP' : 'No disponible';
+                document.getElementById('timestamp').textContent = data.timestamp || 'No disponible';
+                
+                // Actualizar márgenes grandes
+                actualizarMargenGrande('margenCompraGrande', data.margen_compra);
+                actualizarMargenGrande('margenPersonalizadoGrande', data.margen_personalizado);
+                
+                // Actualizar input de precio personalizado si está vacío
+                const inputPrecio = document.getElementById('precioPersonalizado');
+                if (inputPrecio.value === '' && data.precio_personalizado) {
+                    inputPrecio.value = data.precio_personalizado;
+                }
+                
+                // Mostrar alertas si es necesario
+                const alertaContainer = document.getElementById('alertaContainer');
+                if (data.alerta) {
+                    let alertaTexto = '';
+                    if (data.alerta_compra) {
+                        alertaTexto += '¡Margen de compra favorable! ';
+                    }
+                    if (data.alerta_personalizada) {
+                        alertaTexto += '¡Margen personalizado favorable! ';
+                    }
+                    
+                    document.getElementById('alertaTexto').textContent = alertaTexto;
+                    alertaContainer.classList.remove('hidden');
+                } else {
+                    alertaContainer.classList.add('hidden');
+                }
+            })
+            .catch(error => {
+                console.error('Error al cargar datos:', error);
+                // Mostrar mensaje de error en la interfaz
+                document.getElementById('precioMercado').textContent = 'Error al cargar';
+                document.getElementById('precioP2PCompra').textContent = 'Error al cargar';
+                document.getElementById('precioP2PVenta').textContent = 'Error al cargar';
+            });
+            
+            // Cargar gráficos
+            cargarGraficos();
+        }
+        
+        function actualizarMargenGrande(elementId, valor) {
+            const elemento = document.getElementById(elementId);
+            
+            if (valor === null || valor === undefined) {
+                elemento.textContent = 'No disponible';
+                elemento.className = 'value';
+                return;
+            }
+            
+            elemento.textContent = valor.toFixed(2) + ' CLP';
+            
+            if (valor > 0) {
+                elemento.className = 'value margin-positive';
+            } else if (valor < 0) {
+                elemento.className = 'value margin-negative';
+            } else {
+                elemento.className = 'value margin-neutral';
+            }
+        }
+        
+        function cambiarIntervalo(intervalo) {
+            intervaloActual = intervalo;
+            
+            // Actualizar tabs
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            if (intervalo === '1h') {
+                document.querySelector(`.tab:nth-child(1)`).classList.add('active');
+            } else if (intervalo === '1d') {
+                document.querySelector(`.tab:nth-child(2)`).classList.add('active');
+            } else {
+                document.querySelector(`.tab:nth-child(3)`).classList.add('active');
+            }
+            
+            // Recargar gráficos
+            cargarGraficos();
+        }
+        
+        function cargarGraficos() {
+            // Gráfico de precios
+            Promise.all([
+                fetch(`/api/comparador/ohlc/mercado/${intervaloActual}`).then(r => r.json()),
+                fetch(`/api/comparador/ohlc/p2p_compra/${intervaloActual}`).then(r => r.json()),
+                fetch(`/api/comparador/ohlc/p2p_venta/${intervaloActual}`).then(r => r.json())
+            ])
+            .then(([datosMercado, datosP2PCompra, datosP2PVenta]) => {
+                const traces = [];
+                
+                if (datosMercado.length > 0) {
+                    traces.push({
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Precio Mercado',
+                        x: datosMercado.map(d => d.timestamp),
+                        y: datosMercado.map(d => d.close),
+                        line: { color: '#2196F3', width: 3 }
+                    });
+                }
+                
+                if (datosP2PCompra.length > 0) {
+                    traces.push({
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'P2P Compra',
+                        x: datosP2PCompra.map(d => d.timestamp),
+                        y: datosP2PCompra.map(d => d.close),
+                        line: { color: '#4CAF50', width: 3 }
+                    });
+                }
+                
+                if (datosP2PVenta.length > 0) {
+                    traces.push({
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'P2P Venta',
+                        x: datosP2PVenta.map(d => d.timestamp),
+                        y: datosP2PVenta.map(d => d.close),
+                        line: { color: '#F44336', width: 3 }
+                    });
+                }
+                
+                const layout = {
+                    title: {
+                        text: 'Evolución de Precios',
+                        font: { size: 24 }
+                    },
+                    xaxis: { 
+                        title: 'Fecha',
+                        gridcolor: '#eee'
+                    },
+                    yaxis: { 
+                        title: 'Precio (CLP)',
+                        gridcolor: '#eee'
+                    },
+                    legend: { orientation: 'h', y: -0.2 },
+                    template: 'plotly_white',
+                    hovermode: 'closest',
+                    showlegend: true,
+                    margin: { t: 50, l: 50, r: 30, b: 80 }
+                };
+                
+                const config = {
+                    responsive: true,
+                    displayModeBar: true,
+                    modeBarButtonsToRemove: ['lasso2d', 'select2d']
+                };
+                
+                Plotly.newPlot('preciosChart', traces, layout, config);
+            })
+            .catch(error => console.error('Error cargando gráfico de precios:', error));
+            
+            // Gráfico de márgenes
+            Promise.all([
+                fetch(`/api/comparador/ohlc/margen_compra/${intervaloActual}`).then(r => r.json())
+            ])
+            .then(([datosMargenCompra]) => {
+                const traces = [];
+                
+                if (datosMargenCompra.length > 0) {
+                    traces.push({
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Margen Compra',
+                        x: datosMargenCompra.map(d => d.timestamp),
+                        y: datosMargenCompra.map(d => d.close),
+                        fill: 'tozeroy',
+                        line: { color: '#4CAF50', width: 3 }
+                    });
+                    
+                    // Añadir línea de referencia en cero
+                    traces.push({
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Línea cero',
+                        x: datosMargenCompra.map(d => d.timestamp),
+                        y: new Array(datosMargenCompra.length).fill(0),
+                        line: { color: '#777', width: 1, dash: 'dash' },
+                        showlegend: false
+                    });
+                }
+                
+                const layout = {
+                    title: {
+                        text: 'Evolución del Margen',
+                        font: { size: 24 }
+                    },
+                    xaxis: { 
+                        title: 'Fecha',
+                        gridcolor: '#eee'
+                    },
+                    yaxis: { 
+                        title: 'Margen (CLP)',
+                        gridcolor: '#eee',
+                        zerolinecolor: '#FF0000',
+                        zerolinewidth: 2
+                    },
+                    legend: { orientation: 'h', y: -0.2 },
+                    template: 'plotly_white',
+                    hovermode: 'closest',
+                    showlegend: true,
+                    margin: { t: 50, l: 50, r: 30, b: 80 }
+                };
+                
+                const config = {
+                    responsive: true,
+                    displayModeBar: true,
+                    modeBarButtonsToRemove: ['lasso2d', 'select2d']
+                };
+                
+                Plotly.newPlot('margenesChart', traces, layout, config);
+            })
+            .catch(error => console.error('Error cargando gráfico de márgenes:', error));
+        }
+        
+        // Inicializar al cargar la página
+        document.addEventListener('DOMContentLoaded', () => {
+            cargarDatos();
+            // Actualizar datos cada 60 segundos
+            setInterval(cargarDatos, 60000);
+        });
+    </script>
+</body>
+</html> 

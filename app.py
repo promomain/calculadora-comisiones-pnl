@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, send_from_directory, flash
+from flask import Flask, render_template, request, redirect, url_for, send_from_directory, flash, jsonify
 import os
 import uuid
 from werkzeug.utils import secure_filename
@@ -7,6 +7,13 @@ matplotlib.use('Agg')  # Configuración para usar sin interfaz gráfica
 import matplotlib.pyplot as plt
 from comisiones_flexible import calcular_comisiones_por_dia, contar_transacciones_por_dia, generar_informe
 from pnl_calculator import generar_informe_pnl
+import pandas as pd
+import json
+import datetime
+import time
+import csv
+# Importar el módulo de comparador P2P
+from binance_p2p_comparador import comparar_precios, iniciar_scheduler, historial_precios, ultimos_datos, ohlc_data, actualizar_precio_personalizado
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
@@ -80,6 +87,10 @@ def favicon():
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/comisiones')
+def comisiones():
+    return render_template('comisiones.html')
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -291,7 +302,6 @@ def pnl_resultados(file_id):
             resumen_texto = f.read()
         
         # Importar pandas aquí para leer el CSV
-        import pandas as pd
         resultados_df = pd.read_csv(csv_path)
         
         # Convertir la columna de fecha y formatea como string para evitar problemas
@@ -469,6 +479,115 @@ def historial():
             item['fecha_formateada'] = datetime.datetime.fromtimestamp(timestamp).strftime('%d/%m/%Y %H:%M:%S')
     
     return render_template('historial.html', history=history)
+
+# Inicializar el scheduler para el comparador de precios P2P
+scheduler = iniciar_scheduler()
+
+# Ruta principal para mostrar el comparador P2P
+@app.route('/comparador')
+def comparador_p2p():
+    return render_template('comparador_p2p.html')
+
+# API para obtener datos actuales del comparador
+@app.route('/api/comparador')
+def api_comparador():
+    # Verificar si hay datos disponibles
+    if not ultimos_datos.get("timestamp"):
+        # Si no hay datos, realizar una actualización
+        datos = comparar_precios()
+        if datos:
+            return jsonify(datos)
+        return jsonify({"error": "No se pudieron obtener los precios"}), 500
+    
+    return jsonify(ultimos_datos)
+
+# API para obtener historial de precios
+@app.route('/api/comparador/historial')
+def api_historial():
+    # Devolver el historial almacenado (últimos 100 registros)
+    return jsonify(historial_precios)
+
+# API para obtener datos OHLC
+@app.route('/api/comparador/ohlc/<tipo>/<intervalo>')
+def api_ohlc(tipo, intervalo):
+    """Endpoint para obtener datos OHLC para gráficos de velas"""
+    from binance_p2p_comparador import ohlc_data
+    
+    # Validar parámetros
+    if tipo not in ohlc_data or (intervalo != '1h' and intervalo != '1d' and intervalo != 'all'):
+        return jsonify([])
+    
+    # Para "all", combinar datos de ambos intervalos
+    if intervalo == 'all':
+        # Combinar datos de 1h (recientes) y 1d (históricos)
+        df_1h = ohlc_data[tipo]['1h']
+        df_1d = ohlc_data[tipo]['1d']
+        
+        # Convertir a listas de diccionarios para JSON
+        datos_1h = df_1h.to_dict('records') if not df_1h.empty else []
+        datos_1d = df_1d.to_dict('records') if not df_1d.empty else []
+        
+        # Combinar los datasets, evitando duplicados por timestamp
+        resultados = {}
+        for dato in datos_1d:
+            resultados[dato['timestamp']] = dato
+        
+        # Agregar datos más recientes de 1h (sobrescribiendo duplicados)
+        for dato in datos_1h:
+            resultados[dato['timestamp']] = dato
+        
+        # Convertir a lista y ordenar por timestamp
+        datos_combinados = list(resultados.values())
+        datos_combinados.sort(key=lambda x: x['timestamp'])
+        
+        return jsonify(datos_combinados)
+    
+    # Para intervalos regulares
+    df = ohlc_data[tipo][intervalo]
+    if df.empty:
+        return jsonify([])
+    
+    # Convertir a lista de diccionarios para JSON
+    resultados = df.to_dict('records')
+    return jsonify(resultados)
+
+@app.route('/api/comparador/actualizar', methods=['POST'])
+def api_actualizar():
+    datos = comparar_precios()
+    if datos:
+        return jsonify({"success": True, "datos": datos})
+    return jsonify({"success": False, "error": "No se pudieron actualizar los datos"})
+
+@app.route('/api/comparador/precio-personalizado', methods=['POST'])
+def api_precio_personalizado():
+    """Endpoint para actualizar el precio personalizado ingresado por el usuario"""
+    try:
+        data = request.get_json()
+        if not data or 'precio' not in data:
+            return jsonify({"success": False, "error": "Precio no proporcionado"})
+        
+        precio = float(data['precio'])
+        if precio <= 0:
+            return jsonify({"success": False, "error": "El precio debe ser mayor que cero"})
+        
+        # Actualizar el precio personalizado
+        if actualizar_precio_personalizado(precio):
+            # Forzar una actualización para recalcular márgenes
+            datos = comparar_precios()
+            if datos:
+                return jsonify({
+                    "success": True, 
+                    "mensaje": f"Precio personalizado actualizado a {precio} CLP",
+                    "datos": ultimos_datos
+                })
+        
+        return jsonify({"success": False, "error": "No se pudo actualizar el precio personalizado"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/api/comparador/datos')
+def api_datos():
+    return jsonify(ultimos_datos)
 
 if __name__ == '__main__':
     # Configuración para el entorno de producción

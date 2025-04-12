@@ -24,30 +24,38 @@
         .header {
             text-align: center;
             margin-bottom: 2rem;
-            border-bottom: 1px solid #dee2e6;
-            padding-bottom: 1rem;
         }
         .header h1 {
-            color: #0d6efd;
+            color: #4CAF50;
             font-weight: 600;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+            display: inline-block;
         }
         .upload-section {
             background-color: #f1f8ff;
             padding: 2rem;
             border-radius: 8px;
-            border: 1px dashed #0d6efd;
+            border: 1px dashed #4CAF50;
             margin-bottom: 2rem;
         }
         .form-label {
             font-weight: 500;
         }
         .btn-primary {
-            background-color: #0d6efd;
+            background-color: #4CAF50;
             border: none;
             padding: 0.5rem 1.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: background-color 0.3s, transform 0.2s;
         }
         .btn-primary:hover {
-            background-color: #0b5ed7;
+            background-color: #45a049;
+            transform: translateY(-2px);
+        }
+        .btn-primary:active {
+            transform: translateY(0);
         }
         .instructions {
             margin-top: 2rem;
@@ -63,20 +71,66 @@
         .alert {
             margin-bottom: 1.5rem;
         }
-        .nav-tabs {
-            margin-bottom: 1.5rem;
-        }
         .file-input-group {
             margin-bottom: 1.5rem;
             border: 1px solid #dee2e6;
             border-radius: 8px;
             padding: 1rem;
             background-color: #fff;
+            transition: box-shadow 0.3s;
+        }
+        .file-input-group:hover {
+            box-shadow: 0 0.25rem 0.5rem rgba(0,0,0,0.1);
         }
         .file-input-title {
             font-weight: 600;
             margin-bottom: 0.5rem;
-            color: #0d6efd;
+            color: #4CAF50;
+        }
+        input {
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-right: 10px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            font-family: inherit;
+        }
+        input:focus {
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.25);
+            outline: none;
+        }
+
+        /* Menú de navegación moderno */
+        .nav-menu {
+            background-color: #333;
+            overflow: hidden;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+        }
+        
+        .nav-menu a {
+            float: left;
+            display: block;
+            color: white;
+            text-align: center;
+            padding: 14px 20px;
+            text-decoration: none;
+            transition: background-color 0.3s, color 0.3s;
+            font-weight: 500;
+        }
+        
+        .nav-menu a:hover {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .nav-menu a.active {
+            background-color: #4CAF50;
+            color: white;
+            font-weight: bold;
+            box-shadow: inset 0 -3px 0 rgba(255,255,255,0.5);
         }
     </style>
 </head>
@@ -87,17 +141,14 @@
             <p class="lead">Calcula tus ganancias y pérdidas de operaciones P2P a partir de archivos CSV</p>
         </div>
 
-        <ul class="nav nav-tabs">
-            <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('index') }}">Calculadora de Comisiones</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link active" href="{{ url_for('pnl_calculator') }}">Calculadora PNL</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="{{ url_for('historial') }}">Historial</a>
-            </li>
-        </ul>
+        <!-- Menú de navegación -->
+        <div class="nav-menu">
+            <a href="/">Inicio</a>
+            <a href="/comisiones">Comisiones</a>
+            <a href="/pnl" class="active">Calculadora PnL</a>
+            <a href="/comparador">Comparador P2P</a>
+            <a href="/historial">Historial</a>
+        </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}

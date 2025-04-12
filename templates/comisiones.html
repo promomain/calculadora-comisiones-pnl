@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Comisiones</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding-top: 2rem;
+            background-color: #f8f9fa;
+        }
+        .main-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .header h1 {
+            color: #4CAF50;
+            font-weight: 600;
+        }
+        .upload-section {
+            background-color: #f1f8ff;
+            padding: 2rem;
+            border-radius: 8px;
+            border: 1px dashed #4CAF50;
+        }
+        .form-label {
+            font-weight: 500;
+        }
+        .btn-primary {
+            background-color: #4CAF50;
+            border: none;
+            padding: 0.5rem 1.5rem;
+        }
+        .btn-primary:hover {
+            background-color: #45a049;
+        }
+        .instructions {
+            margin-top: 2rem;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+        .instructions h3 {
+            color: #6c757d;
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+        }
+        .alert {
+            margin-bottom: 1.5rem;
+        }
+        
+        /* Menú de navegación moderno */
+        .nav-menu {
+            background-color: #333;
+            overflow: hidden;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+        }
+        
+        .nav-menu a {
+            float: left;
+            display: block;
+            color: white;
+            text-align: center;
+            padding: 14px 20px;
+            text-decoration: none;
+            transition: background-color 0.3s, color 0.3s;
+            font-weight: 500;
+        }
+        
+        .nav-menu a:hover {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .nav-menu a.active {
+            background-color: #4CAF50;
+            color: white;
+            font-weight: bold;
+            box-shadow: inset 0 -3px 0 rgba(255,255,255,0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="container main-container">
+        <div class="header">
+            <h1>Calculadora de Comisiones</h1>
+            <p class="lead">Analiza tus operaciones financieras P2P</p>
+        </div>
+
+        <!-- Menú de navegación -->
+        <div class="nav-menu">
+            <a href="/">Inicio</a>
+            <a href="/comisiones" class="active">Comisiones</a>
+            <a href="/pnl">Calculadora PnL</a>
+            <a href="/comparador">Comparador P2P</a>
+            <a href="/historial">Historial</a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="upload-section">
+            <form method="POST" action="{{ url_for('upload_file') }}" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label for="formFile" class="form-label">Selecciona tu archivo CSV con datos de comisiones</label>
+                    <input class="form-control" type="file" id="formFile" name="file" accept=".csv">
+                    <div class="form-text">El archivo debe contener columnas de Maker Fee, Taker Fee, Created Time y Status.</div>
+                </div>
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">Analizar Comisiones</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="instructions">
+            <h3>Cómo usar esta herramienta</h3>
+            <ol>
+                <li>Sube un archivo CSV que contenga tus transacciones con comisiones.</li>
+                <li>El archivo debe incluir al menos las columnas:
+                    <ul>
+                        <li><strong>Maker Fee</strong> - Comisiones como maker</li>
+                        <li><strong>Taker Fee</strong> - Comisiones como taker</li>
+                        <li><strong>Created Time</strong> - Fecha y hora de la transacción</li>
+                        <li><strong>Status</strong> - Estado de la transacción (solo se procesan las "Completed")</li>
+                    </ul>
+                </li>
+                <li>El sistema generará un informe detallado y un gráfico de tus comisiones agrupadas por día.</li>
+                <li>Podrás descargar tanto el informe como el gráfico para tu uso personal.</li>
+                <li><strong>Nota importante:</strong> Solo se consideran las transacciones con estado "Completed".</li>
+            </ol>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 
