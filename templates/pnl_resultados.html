@@ -328,6 +328,12 @@
                                                                 {% else %}
                                                                     ${{ '{:,.2f}'.format(compra['Monto Cerrado']) }}
                                                                 {% endif %}
+                                                            {% elif 'Total Price' in compra %}
+                                                                {% if compra['Total Price'] is string %}
+                                                                    {{ compra['Total Price'] }}
+                                                                {% else %}
+                                                                    ${{ '{:,.2f}'.format(compra['Total Price']) }}
+                                                                {% endif %}
                                                             {% else %}
                                                                 -
                                                             {% endif %}
@@ -339,16 +345,34 @@
                                                                 {% else %}
                                                                     ${{ '{:,.2f}'.format(compra['Precio']) }}
                                                                 {% endif %}
+                                                            {% elif 'Price' in compra %}
+                                                                {% if compra['Price'] is string %}
+                                                                    {{ compra['Price'] }}
+                                                                {% else %}
+                                                                    ${{ '{:,.2f}'.format(compra['Price']) }}
+                                                                {% endif %}
                                                             {% else %}
                                                                 -
                                                             {% endif %}
                                                         </td>
                                                         <td>
-                                                            {% if 'Monto Cerrado' in compra and 'Precio' in compra %}
-                                                                {% if compra['Monto Cerrado'] is number and compra['Precio'] is number and compra['Precio'] != 0 %}
+                                                            {% if 'Monto Cerrado' in compra and 'Precio' in compra and compra['Precio'] != 0 %}
+                                                                {% if compra['Monto Cerrado'] is number and compra['Precio'] is number %}
                                                                     {{ '{:,.2f}'.format(compra['Monto Cerrado'] / compra['Precio']) }}
                                                                 {% else %}
                                                                     -
+                                                                {% endif %}
+                                                            {% elif 'Total Price' in compra and 'Price' in compra and compra['Price'] != 0 %}
+                                                                {% if compra['Total Price'] is number and compra['Price'] is number %}
+                                                                    {{ '{:,.2f}'.format(compra['Total Price'] / compra['Price']) }}
+                                                                {% else %}
+                                                                    -
+                                                                {% endif %}
+                                                            {% elif 'Quantity' in compra %}
+                                                                {% if compra['Quantity'] is string %}
+                                                                    {{ compra['Quantity'] }}
+                                                                {% else %}
+                                                                    {{ '{:,.2f}'.format(compra['Quantity']) }}
                                                                 {% endif %}
                                                             {% else %}
                                                                 -

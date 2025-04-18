@@ -343,10 +343,28 @@ def pnl_resultados(file_id):
                         
                         # Convertir columnas monetarias sin redondeo si existen
                         if 'Monto Cerrado' in compras_por_dia.columns:
-                            compras_por_dia['Monto Cerrado'] = compras_por_dia['Monto Cerrado'].astype(str).str.replace('$', '').str.replace(',', '').astype(float)
+                            try:
+                                # Intentar primero convertir directamente si ya es numérico
+                                if compras_por_dia['Monto Cerrado'].dtype.kind in 'ifc':
+                                    pass  # Ya es numérico
+                                else:
+                                    # Intentar limpiar y convertir
+                                    compras_por_dia['Monto Cerrado'] = compras_por_dia['Monto Cerrado'].astype(str).str.replace('$', '').str.replace(',', '').astype(float)
+                                print(f"Monto Cerrado convertido correctamente")
+                            except Exception as e:
+                                print(f"Error convirtiendo Monto Cerrado: {e}")
                         
                         if 'Precio' in compras_por_dia.columns:
-                            compras_por_dia['Precio'] = compras_por_dia['Precio'].astype(str).str.replace('$', '').str.replace(',', '').astype(float)
+                            try:
+                                # Intentar primero convertir directamente si ya es numérico
+                                if compras_por_dia['Precio'].dtype.kind in 'ifc':
+                                    pass  # Ya es numérico
+                                else:
+                                    # Intentar limpiar y convertir
+                                    compras_por_dia['Precio'] = compras_por_dia['Precio'].astype(str).str.replace('$', '').str.replace(',', '').astype(float)
+                                print(f"Precio convertido correctamente")
+                            except Exception as e:
+                                print(f"Error convirtiendo Precio: {e}")
                         
                         # Convertir la fecha a formato estándar
                         if 'Fecha' in compras_por_dia.columns:
@@ -363,12 +381,25 @@ def pnl_resultados(file_id):
                                 except:
                                     pass
                             
+                            # Probar otros formatos si aún hay fechas nulas
+                            if compras_por_dia['Fecha'].isna().any():
+                                try:
+                                    # Intentar formato yyyy-mm-dd
+                                    fechas_tmp = pd.to_datetime(compras_por_dia['Fecha'], errors='coerce')
+                                    # Reemplazar solo los valores nulos
+                                    compras_por_dia.loc[compras_por_dia['Fecha'].isna(), 'Fecha'] = fechas_tmp.loc[compras_por_dia['Fecha'].isna()]
+                                except:
+                                    pass
+                            
                             # Asegurarse que el año sea el actual si no está especificado
                             current_year = datetime.now().year
-                            compras_por_dia['Fecha'] = compras_por_dia['Fecha'].apply(lambda x: x.replace(year=current_year) if pd.notnull(x) else x)
+                            compras_por_dia['Fecha'] = compras_por_dia['Fecha'].apply(lambda x: x.replace(year=current_year) if pd.notnull(x) and x.year < 2000 else x)
                             
-                            # Convertir a formato de string para la comparación
+                            # Convertir a formato de string para la comparación - MISMO FORMATO QUE RESULTADOS_DF
                             compras_por_dia['Fecha'] = compras_por_dia['Fecha'].dt.strftime('%Y-%m-%d')
+                            
+                            # Imprimir para depuración
+                            print(f"Fechas únicas en compras: {compras_por_dia['Fecha'].unique()}")
                     except Exception as e:
                         print(f"Error al procesar archivo de compras: {e}")
                         compras_por_dia = None
@@ -428,18 +459,23 @@ def pnl_resultados(file_id):
                         ventas_por_dia = None
                 
                 # Generar detalle para cada fecha en resultados_df
+                print(f"Fechas en resultados_df: {resultados_df['Fecha'].unique()}")
+                
                 for _, row in resultados_df.iterrows():
                     fecha_str = row['Fecha']
+                    print(f"Procesando fecha: {fecha_str}")
                     
                     # Detalles de compra de este día
                     compras_dia = pd.DataFrame()
                     if compras_por_dia is not None and 'Fecha' in compras_por_dia.columns:
                         compras_dia = compras_por_dia[compras_por_dia['Fecha'] == fecha_str]
+                        print(f"  Encontradas {len(compras_dia)} compras para fecha {fecha_str}")
                     
                     # Detalles de venta de este día
                     ventas_dia = pd.DataFrame()
                     if ventas_por_dia is not None and 'Fecha' in ventas_por_dia.columns:
                         ventas_dia = ventas_por_dia[ventas_por_dia['Fecha'] == fecha_str]
+                        print(f"  Encontradas {len(ventas_dia)} ventas para fecha {fecha_str}")
                     
                     # Guardar los detalles solo si hay datos
                     if not compras_dia.empty or not ventas_dia.empty:
