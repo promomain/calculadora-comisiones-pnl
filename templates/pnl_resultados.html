@@ -492,13 +492,40 @@
             $('.clickable-row').click(function() {
                 var fecha = $(this).data('fecha');
                 $('#details-' + fecha).toggle();
+                
+                // Añadir/quitar clase activa para resaltar la fila seleccionada
+                $(this).toggleClass('active-row');
+                
+                // Verificar si hay detalles disponibles
+                var detallesDiv = $('#details-' + fecha + ' .detail-container');
+                if (detallesDiv.find('.alert-info').length > 0) {
+                    console.log("No hay detalles disponibles para el día " + fecha);
+                }
             });
             
             // Al hacer clic en el botón Cerrar Detalles
             $('.close-details').click(function(e) {
                 e.stopPropagation();
-                $(this).closest('.detail-row').hide();
+                var detailRow = $(this).closest('.detail-row');
+                detailRow.hide();
+                
+                // También quitar la clase activa de la fila principal
+                var fecha = detailRow.attr('id').replace('details-', '');
+                $('[data-fecha="' + fecha + '"]').removeClass('active-row');
             });
+            
+            // Añadir estilos dinámicos para mejorar la experiencia
+            $('<style>')
+                .prop('type', 'text/css')
+                .html(`
+                    .clickable-row { cursor: pointer; }
+                    .clickable-row:hover { background-color: #f1f8ff; }
+                    .active-row { background-color: #e8f4fe !important; }
+                    .detail-row { display: none; }
+                    .detail-container { padding: 20px; animation: fadeIn 0.3s; }
+                    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                `)
+                .appendTo('head');
         });
     </script>
 </body>

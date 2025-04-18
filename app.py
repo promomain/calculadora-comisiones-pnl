@@ -321,103 +321,143 @@ def pnl_resultados(file_id):
         # Filtrar los archivos que pertenecen a este file_id
         related_files = [f for f in uploaded_files if file_id in f]
         compras_file = next((os.path.join(uploads_path, f) for f in related_files if "compra" in f.lower()), None)
-        ventas_file = next((os.path.join(uploads_path, f) for f in related_files if "venta" in f.lower()), None)
+        ventas_file = next((os.path.join(uploads_path, f) for f in related_files if "venta" in f.lower() or "p2p" in f.lower()), None)
         
         # Datos detallados para cada día
         detalles_por_dia = {}
         
-        if compras_file and ventas_file:
+        print(f"\n--- Procesando detalles para visualización ---")
+        print(f"Archivo de compras: {compras_file}")
+        print(f"Archivo de ventas/P2P: {ventas_file}")
+        
+        if compras_file or ventas_file:
             # Cargar archivos originales
             try:
-                # Procesar archivos para obtener datos detallados
-                compras_por_dia = pd.read_csv(compras_file)
-                ventas_por_dia = pd.read_csv(ventas_file)
-                
-                # Intentar convertir valores numéricos
-                for col in compras_por_dia.columns:
-                    if col not in ['Fecha']:
-                        try:
-                            compras_por_dia[col] = pd.to_numeric(compras_por_dia[col], errors='ignore')
-                        except:
-                            pass
-                            
-                # Tratar de colocar valores numéricos en cada columna excepto las de texto
-                for col in ventas_por_dia.columns:
-                    if col not in ['Created Time', 'Status', 'Fiat Type', 'Asset Type', 'Order Type', 'Order Number', 'Couterparty']:
-                        try:
-                            # Para las columnas de comisiones, hacemos un tratamiento especial
-                            if col in ['Maker Fee', 'Taker Fee']:
-                                # Reemplazar comillas vacías con 0
-                                ventas_por_dia[col] = ventas_por_dia[col].astype(str).replace('', '0')
-                                # Encontrar valores específicos como "0.05" y marcarlos
-                                ventas_por_dia[col + '_original'] = ventas_por_dia[col]
-                                # Continuar con la conversión normal
-                                ventas_por_dia[col] = pd.to_numeric(ventas_por_dia[col], errors='coerce').fillna(0)
-                            else:
-                                ventas_por_dia[col] = pd.to_numeric(ventas_por_dia[col], errors='coerce').fillna(0)
-                        except Exception as e:
-                            print(f"Error procesando columna {col}: {e}")
-                
-                # Convertir fechas
-                try:
-                    compras_por_dia['Fecha'] = pd.to_datetime(compras_por_dia['Fecha'], format='%d/%m')
-                    current_year = pd.Timestamp.now().year
-                    compras_por_dia['Fecha'] = compras_por_dia['Fecha'].apply(lambda x: x.replace(year=current_year) if pd.notnull(x) else x)
-                    compras_por_dia['Fecha'] = compras_por_dia['Fecha'].dt.strftime('%Y-%m-%d')
-                except:
-                    # Si hay error, es posible que el formato sea diferente
-                    pass
-                    
-                try:
-                    ventas_por_dia['Fecha'] = pd.to_datetime(ventas_por_dia['Created Time']).dt.date
-                    ventas_por_dia['Fecha'] = pd.to_datetime(ventas_por_dia['Fecha'])
-                    ventas_por_dia['Fecha'] = ventas_por_dia['Fecha'].dt.strftime('%Y-%m-%d')
-                except:
-                    # Si hay error, es posible que el formato sea diferente
-                    pass
-                
-                # Filtrar ventas completadas
-                if 'Status' in ventas_por_dia.columns:
-                    ventas_por_dia = ventas_por_dia[ventas_por_dia['Status'] == 'Completed']
-                    
-                # Diagnóstico: Imprimir algunos valores de Maker Fee y Taker Fee
-                if 'Maker Fee' in ventas_por_dia.columns and 'Taker Fee' in ventas_por_dia.columns:
-                    print("\n=== DIAGNÓSTICO DE COMISIONES ===")
-                    print(f"Tipos de datos en columnas de comisiones:")
-                    print(f"Maker Fee dtype: {ventas_por_dia['Maker Fee'].dtype}")
-                    print(f"Taker Fee dtype: {ventas_por_dia['Taker Fee'].dtype}")
-                    
-                    # Imprimir los primeros 5 valores
-                    print("\nPrimeros 5 valores de comisiones:")
-                    for i, row in ventas_por_dia.head(5).iterrows():
-                        print(f"Índice {i}:")
-                        print(f"  Maker Fee: '{row['Maker Fee']}' (tipo: {type(row['Maker Fee'])})")
-                        print(f"  Taker Fee: '{row['Taker Fee']}' (tipo: {type(row['Taker Fee'])})")
+                # Procesar archivo de compras
+                compras_por_dia = None
+                if compras_file:
+                    try:
+                        # Leer el archivo CSV con precisión completa
+                        compras_por_dia = pd.read_csv(compras_file, float_precision='high')
+                        print(f"Columnas en archivo de compras: {compras_por_dia.columns.tolist()}")
                         
-                    # Valores únicos
-                    maker_uniques = ventas_por_dia['Maker Fee'].unique()
-                    taker_uniques = ventas_por_dia['Taker Fee'].unique()
-                    print("\nValores únicos en Maker Fee:", maker_uniques)
-                    print("Valores únicos en Taker Fee:", taker_uniques)
-                    print("=== FIN DE DIAGNÓSTICO ===\n")
+                        # Convertir columnas monetarias sin redondeo si existen
+                        if 'Monto Cerrado' in compras_por_dia.columns:
+                            compras_por_dia['Monto Cerrado'] = compras_por_dia['Monto Cerrado'].astype(str).str.replace('$', '').str.replace(',', '').astype(float)
+                        
+                        if 'Precio' in compras_por_dia.columns:
+                            compras_por_dia['Precio'] = compras_por_dia['Precio'].astype(str).str.replace('$', '').str.replace(',', '').astype(float)
+                        
+                        # Convertir la fecha a formato estándar
+                        if 'Fecha' in compras_por_dia.columns:
+                            # Intentar varios formatos de fecha
+                            try:
+                                compras_por_dia['Fecha'] = pd.to_datetime(compras_por_dia['Fecha'], format='%d/%m/%Y', errors='coerce')
+                            except:
+                                pass
+                                
+                            # Si la conversión falló, intentar con otro formato
+                            if compras_por_dia['Fecha'].isna().all():
+                                try:
+                                    compras_por_dia['Fecha'] = pd.to_datetime(compras_por_dia['Fecha'], format='%d/%m', errors='coerce')
+                                except:
+                                    pass
+                            
+                            # Asegurarse que el año sea el actual si no está especificado
+                            current_year = datetime.now().year
+                            compras_por_dia['Fecha'] = compras_por_dia['Fecha'].apply(lambda x: x.replace(year=current_year) if pd.notnull(x) else x)
+                            
+                            # Convertir a formato de string para la comparación
+                            compras_por_dia['Fecha'] = compras_por_dia['Fecha'].dt.strftime('%Y-%m-%d')
+                    except Exception as e:
+                        print(f"Error al procesar archivo de compras: {e}")
+                        compras_por_dia = None
+                
+                # Procesar archivo de ventas/P2P
+                ventas_por_dia = None
+                if ventas_file:
+                    try:
+                        # Leer el archivo CSV con precisión completa
+                        ventas_por_dia = pd.read_csv(ventas_file, float_precision='high')
+                        print(f"Columnas en archivo de ventas/P2P: {ventas_por_dia.columns.tolist()}")
+                        
+                        # Verificar si es un archivo de Binance P2P
+                        es_binance_p2p = 'Order Type' in ventas_por_dia.columns and 'Status' in ventas_por_dia.columns
+                        
+                        if es_binance_p2p:
+                            # Filtrar solo transacciones completadas
+                            ventas_por_dia = ventas_por_dia[ventas_por_dia['Status'] == 'Completed']
+                            
+                            # Convertir columnas monetarias y numéricas sin redondeo
+                            for col in ['Total Price', 'Price', 'Quantity']:
+                                if col in ventas_por_dia.columns:
+                                    ventas_por_dia[col] = pd.to_numeric(ventas_por_dia[col], errors='coerce')
+                            
+                            # Convertir columnas de comisiones
+                            for col in ['Maker Fee', 'Taker Fee']:
+                                if col in ventas_por_dia.columns:
+                                    ventas_por_dia[col] = pd.to_numeric(ventas_por_dia[col], errors='coerce').fillna(0)
+                            
+                            # Extraer la fecha de 'Created Time'
+                            if 'Created Time' in ventas_por_dia.columns:
+                                ventas_por_dia['Fecha'] = pd.to_datetime(ventas_por_dia['Created Time']).dt.date
+                                ventas_por_dia['Fecha'] = pd.to_datetime(ventas_por_dia['Fecha'])
+                                ventas_por_dia['Fecha'] = ventas_por_dia['Fecha'].dt.strftime('%Y-%m-%d')
+                                
+                            # Separar ventas y compras si necesario
+                            if 'Order Type' in ventas_por_dia.columns:
+                                ventas_p2p = ventas_por_dia[ventas_por_dia['Order Type'] == 'Sell']
+                                compras_p2p = ventas_por_dia[ventas_por_dia['Order Type'] == 'Buy']
+                                
+                                # Combinar con compras existentes si es necesario
+                                if not compras_p2p.empty and compras_por_dia is None:
+                                    compras_por_dia = compras_p2p
+                                elif not compras_p2p.empty:
+                                    # Usar solo el dataframe de Binance P2P para compras
+                                    compras_p2p_procesadas = compras_p2p.copy()
+                                    compras_p2p_procesadas['Monto Cerrado'] = compras_p2p_procesadas['Total Price']
+                                    compras_p2p_procesadas['Precio'] = compras_p2p_procesadas['Price']
+                                    
+                                    # Concatenar con las compras existentes
+                                    compras_por_dia = pd.concat([compras_por_dia, compras_p2p_procesadas], ignore_index=True)
+                                
+                                # Usar solo ventas P2P
+                                ventas_por_dia = ventas_p2p
+                    except Exception as e:
+                        print(f"Error al procesar archivo de ventas/P2P: {e}")
+                        ventas_por_dia = None
                 
                 # Generar detalle para cada fecha en resultados_df
                 for _, row in resultados_df.iterrows():
                     fecha_str = row['Fecha']
                     
                     # Detalles de compra de este día
-                    compras_dia = compras_por_dia[compras_por_dia['Fecha'] == fecha_str] if 'Fecha' in compras_por_dia.columns else pd.DataFrame()
+                    compras_dia = pd.DataFrame()
+                    if compras_por_dia is not None and 'Fecha' in compras_por_dia.columns:
+                        compras_dia = compras_por_dia[compras_por_dia['Fecha'] == fecha_str]
                     
                     # Detalles de venta de este día
-                    ventas_dia = ventas_por_dia[ventas_por_dia['Fecha'] == fecha_str] if 'Fecha' in ventas_por_dia.columns else pd.DataFrame()
+                    ventas_dia = pd.DataFrame()
+                    if ventas_por_dia is not None and 'Fecha' in ventas_por_dia.columns:
+                        ventas_dia = ventas_por_dia[ventas_por_dia['Fecha'] == fecha_str]
                     
-                    # Guardar los detalles
-                    detalles_por_dia[fecha_str] = {
-                        'compras': compras_dia.to_dict('records') if not compras_dia.empty else [],
-                        'ventas': ventas_dia.to_dict('records') if not ventas_dia.empty else []
-                    }
+                    # Guardar los detalles solo si hay datos
+                    if not compras_dia.empty or not ventas_dia.empty:
+                        detalles_por_dia[fecha_str] = {
+                            'compras': compras_dia.to_dict('records') if not compras_dia.empty else [],
+                            'ventas': ventas_dia.to_dict('records') if not ventas_dia.empty else []
+                        }
+                        print(f"Fecha {fecha_str}: {len(compras_dia)} compras, {len(ventas_dia)} ventas")
+                
+                # Imprimir información de depuración
+                print(f"Total de días con detalles: {len(detalles_por_dia)}")
+                for fecha, detalles in detalles_por_dia.items():
+                    print(f"  {fecha}: {len(detalles['compras'])} compras, {len(detalles['ventas'])} ventas")
+                
             except Exception as e:
                 print(f"Error al procesar detalles: {e}")
+                import traceback
+                traceback.print_exc()
                 # Si hay error en los detalles, continuamos sin ellos
                 detalles_por_dia = {}
         
@@ -438,6 +478,8 @@ def pnl_resultados(file_id):
     
     except Exception as e:
         flash(f'Error al mostrar los resultados: {str(e)}', 'error')
+        import traceback
+        traceback.print_exc()
         return redirect(url_for('pnl_calculator'))
 
 @app.route('/pnl/descargar/<tipo>/<file_id>')

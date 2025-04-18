@@ -21,7 +21,11 @@ def procesar_archivo_compras(archivo_csv):
         df['USD Comprado'] = df['Monto Cerrado'] / df['Precio']
         
         # Convertir la fecha a formato estándar
-        df['Fecha'] = pd.to_datetime(df['Fecha'], format='%d/%m', errors='coerce')
+        df['Fecha'] = pd.to_datetime(df['Fecha'], format='%d/%m/%Y', errors='coerce')
+        
+        # Si la conversión falló, intentar con otro formato
+        if df['Fecha'].isna().all():
+            df['Fecha'] = pd.to_datetime(df['Fecha'], format='%d/%m', errors='coerce')
         
         # Asegurarse que el año sea el actual si no está especificado
         current_year = datetime.now().year
@@ -36,6 +40,7 @@ def procesar_archivo_compras(archivo_csv):
         # Calcular precio promedio de compra con precisión completa
         compras_por_dia['Precio Promedio Compra'] = compras_por_dia['Monto Cerrado'] / compras_por_dia['USD Comprado']
         
+        print(f"Datos de compras procesados: {len(compras_por_dia)} días")
         return compras_por_dia
     
     except Exception as e:
@@ -44,7 +49,7 @@ def procesar_archivo_compras(archivo_csv):
 
 def procesar_archivo_ventas(archivo_csv):
     """
-    Procesa el archivo CSV de ventas y retorna un DataFrame con las ventas por día
+    Procesa el archivo CSV de Binance P2P y retorna DataFrames con las ventas y compras por día
     """
     try:
         # Leer el archivo CSV con precisión completa
@@ -54,48 +59,81 @@ def procesar_archivo_ventas(archivo_csv):
         df = df[df['Status'] == 'Completed']
         
         # Convertir columnas monetarias y numéricas sin redondeo
-        df['Price'] = df['Price'].astype(float)
-        df['Quantity'] = df['Quantity'].astype(float)
-        
-        # Calcular el valor real multiplicando Price * Quantity para cada transacción
-        df['Valor Real'] = df['Price'] * df['Quantity']
+        df['Total Price'] = pd.to_numeric(df['Total Price'], errors='coerce')
+        df['Price'] = pd.to_numeric(df['Price'], errors='coerce')
+        df['Quantity'] = pd.to_numeric(df['Quantity'], errors='coerce')
         
         # Convertir columnas de comisiones, manejar valores vacíos sin redondeo
         df['Maker Fee'] = pd.to_numeric(df['Maker Fee'], errors='coerce').fillna(0)
         df['Taker Fee'] = pd.to_numeric(df['Taker Fee'], errors='coerce').fillna(0)
-        df['Comisiones'] = df['Maker Fee'] + df['Taker Fee']
+        df['Comisiones'] = df[['Maker Fee', 'Taker Fee']].sum(axis=1)
         
         # Extraer la fecha de 'Created Time'
         df['Fecha'] = pd.to_datetime(df['Created Time']).dt.date
         df['Fecha'] = pd.to_datetime(df['Fecha'])
         
-        # Agrupar por fecha y calcular totales sin redondeo
-        ventas_por_dia = df.groupby('Fecha').agg({
-            'Valor Real': 'sum',
-            'Quantity': 'sum',
-            'Comisiones': 'sum'
-        }).reset_index()
+        # Separar ventas y compras
+        df_ventas = df[df['Order Type'] == 'Sell']
+        df_compras = df[df['Order Type'] == 'Buy']
         
-        # Calcular precio promedio de venta usando Valor Real / Quantity
-        ventas_por_dia['Precio Promedio Venta'] = ventas_por_dia['Valor Real'] / ventas_por_dia['Quantity']
+        # Procesar ventas
+        ventas_por_dia = None
+        if not df_ventas.empty:
+            ventas_por_dia = df_ventas.groupby('Fecha').agg({
+                'Total Price': 'sum',
+                'Quantity': 'sum',
+                'Comisiones': 'sum'
+            }).reset_index()
+            
+            # Calcular precio promedio de venta
+            ventas_por_dia['Precio Promedio Venta'] = ventas_por_dia['Total Price'] / ventas_por_dia['Quantity']
+            print(f"Datos de ventas procesados: {len(ventas_por_dia)} días")
         
-        # Copiar Valor Real a Total Price para mantener compatibilidad con el resto del código
-        ventas_por_dia['Total Price'] = ventas_por_dia['Valor Real']
+        # Procesar compras (nuevas)
+        compras_por_dia = None
+        if not df_compras.empty:
+            # Agrupar compras por día
+            compras_por_dia = df_compras.groupby('Fecha').agg({
+                'Total Price': 'sum',
+                'Quantity': 'sum',
+                'Comisiones': 'sum'
+            }).reset_index()
+            
+            # Renombrar columnas para hacerlas compatibles con el formato del archivo de compras
+            compras_por_dia = compras_por_dia.rename(columns={
+                'Total Price': 'Monto Cerrado',
+                'Quantity': 'USD Comprado'
+            })
+            
+            # Calcular precio promedio de compra
+            compras_por_dia['Precio Promedio Compra'] = compras_por_dia['Monto Cerrado'] / compras_por_dia['USD Comprado']
+            
+            print(f"Se encontraron {len(df_compras)} operaciones de compra en el archivo de Binance P2P")
+            print(f"Datos de compras P2P procesados: {len(compras_por_dia)} días")
         
-        return ventas_por_dia
+        # Retornar ambos DataFrames
+        return ventas_por_dia, compras_por_dia
     
     except Exception as e:
         print(f"Error al procesar archivo de ventas: {e}")
-        return None
+        return None, None
 
 def calcular_pnl_diario(compras_df, ventas_df):
     """
     Calcula el PNL diario combinando datos de compras y ventas
     """
     try:
-        # Si alguno de los dataframes es None, retornar None
+        # Si alguno de los dataframes es None o está vacío, retornar None
         if compras_df is None or ventas_df is None:
+            if compras_df is None:
+                print("No hay datos de compras disponibles")
+            if ventas_df is None:
+                print("No hay datos de ventas disponibles")
             return None
+        
+        # Imprimir información sobre los dataframes para depuración
+        print(f"DataFrame de compras tiene {len(compras_df)} filas con columnas: {compras_df.columns.tolist()}")
+        print(f"DataFrame de ventas tiene {len(ventas_df)} filas con columnas: {ventas_df.columns.tolist()}")
         
         # Crear una lista de todas las fechas únicas ordenadas
         todas_fechas = pd.concat([compras_df['Fecha'], ventas_df['Fecha']]).unique()
@@ -111,7 +149,7 @@ def calcular_pnl_diario(compras_df, ventas_df):
         resultados['USD Vendido'] = 0.0
         resultados['Monto Venta'] = 0.0
         resultados['Precio Promedio Venta'] = 0.0
-        resultados['Precio Promedio Stock'] = 0.0  # Nueva columna
+        resultados['Precio Promedio Stock'] = 0.0
         resultados['Margen'] = 0.0
         resultados['PNL Bruto'] = 0.0
         resultados['Comisiones'] = 0.0
@@ -175,25 +213,13 @@ def calcular_pnl_diario(compras_df, ventas_df):
                     margen = precio_venta_hoy - precio_promedio_stock
                     pnl_bruto_clp = margen * usd_vendido_efectivo
                     # Convertir PNL bruto de CLP a USD sin redondeo
-                    pnl_bruto_usd = pnl_bruto_clp / precio_promedio_stock
+                    pnl_bruto_usd = pnl_bruto_clp / precio_promedio_stock if precio_promedio_stock > 0 else 0
                     # Restar comisiones que ya están en USD sin redondeo
                     pnl_neto_usd = pnl_bruto_usd - comisiones_hoy
                     
                     resultados.at[idx, 'Margen'] = margen
                     resultados.at[idx, 'PNL Bruto'] = pnl_bruto_usd
                     resultados.at[idx, 'PNL Neto'] = pnl_neto_usd
-                    
-                    # Imprimir valores detallados para depuración
-                    if fecha_actual.date() == pd.to_datetime('2025-04-03').date():
-                        print(f"\n=== CÁLCULO DETALLADO DE PNL (3 DE ABRIL) ===")
-                        print(f"  Margen exacto: {margen:.10f}")
-                        print(f"  USD vendido efectivo exacto: {usd_vendido_efectivo:.10f}")
-                        print(f"  Precio promedio stock exacto: {precio_promedio_stock:.10f}")
-                        print(f"  PNL bruto CLP exacto: {pnl_bruto_clp:.10f}")
-                        print(f"  Conversión exacta a USD: {pnl_bruto_clp:.10f} / {precio_promedio_stock:.10f} = {pnl_bruto_usd:.10f}")
-                        print(f"  Comisiones exactas: {comisiones_hoy:.10f}")
-                        print(f"  PNL neto USD exacto: {pnl_bruto_usd:.10f} - {comisiones_hoy:.10f} = {pnl_neto_usd:.10f}")
-                        print("=== FIN CÁLCULO DETALLADO ===\n")
                     
                     # Actualizar remanente sin redondeo
                     remanente_usd = stock_disponible - usd_vendido_efectivo - comisiones_hoy
@@ -216,10 +242,18 @@ def calcular_pnl_diario(compras_df, ventas_df):
             if remanente_usd > 0:
                 resultados.at[idx, 'Precio Promedio Remanente'] = remanente_monto / remanente_usd
         
+        # Imprimir suma de resultados para depuración
+        print(f"Resultados calculados con éxito: {len(resultados)} días")
+        print(f"Total USD comprado: {resultados['USD Comprado'].sum():.2f}")
+        print(f"Total USD vendido: {resultados['USD Vendido'].sum():.2f}")
+        print(f"Remanente final: {remanente_usd:.2f} USD")
+        
         return resultados
     
     except Exception as e:
         print(f"Error al calcular PNL diario: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def generar_grafico_pnl(df_resultados, nombre_salida):
@@ -242,7 +276,8 @@ def generar_grafico_pnl(df_resultados, nombre_salida):
         # Agregar etiquetas de valor encima de cada barra
         for bar, valor in zip(bars, pnl_neto):
             color = 'green' if valor >= 0 else 'red'
-            plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + (1 if valor >= 0 else -20),
+            vertical_offset = 1 if valor >= 0 else -20
+            plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + vertical_offset,
                      f"{valor:,.2f}", ha='center', va='bottom', color=color, fontweight='bold')
         
         # Configurar gráfico
@@ -268,14 +303,42 @@ def generar_informe_pnl(archivo_compras, archivo_ventas, guardar_grafico=True, n
     Función principal que procesa los archivos y genera el informe completo de PNL
     """
     try:
+        print("\n--- Iniciando generación de informe PNL ---")
+        
         # Procesar archivos
         compras_df = procesar_archivo_compras(archivo_compras)
-        ventas_df = procesar_archivo_ventas(archivo_ventas)
+        ventas_df, compras_df_binance = procesar_archivo_ventas(archivo_ventas)
+        
+        # Combinar las compras de Fugiro con las compras de Binance P2P si existen
+        if compras_df_binance is not None and not compras_df_binance.empty:
+            if compras_df is not None:
+                print(f"Combinando {len(compras_df)} compras de Fugiro con {len(compras_df_binance)} compras de Binance P2P")
+                
+                # Concatenar los dos DataFrames
+                compras_df = pd.concat([compras_df, compras_df_binance], ignore_index=True)
+                
+                # Agrupar por fecha para combinar operaciones del mismo día
+                compras_df = compras_df.groupby('Fecha').agg({
+                    'Monto Cerrado': 'sum',
+                    'USD Comprado': 'sum'
+                }).reset_index()
+                
+                # Recalcular precio promedio de compra
+                compras_df['Precio Promedio Compra'] = compras_df['Monto Cerrado'] / compras_df['USD Comprado']
+                
+                print(f"Total combinado: {len(compras_df)} días con operaciones de compra")
+            else:
+                print("No se pudieron procesar las compras de Fugiro, usando solo compras de Binance P2P")
+                compras_df = compras_df_binance
+        elif compras_df is None and compras_df_binance is not None:
+            print("No se encontraron compras de Fugiro, usando solo compras de Binance P2P")
+            compras_df = compras_df_binance
         
         # Calcular PNL diario
         resultados_df = calcular_pnl_diario(compras_df, ventas_df)
         
         if resultados_df is None:
+            print("Error: No se pudo calcular el PNL diario")
             return None
         
         # Generar gráfico
@@ -327,6 +390,7 @@ def generar_informe_pnl(archivo_compras, archivo_ventas, guardar_grafico=True, n
         with open(f"{nombre_salida}_informe.txt", "w") as f:
             f.write("\n".join(resumen))
         
+        print("--- Informe PNL generado con éxito ---\n")
         return {
             'resultados_df': resultados_df,
             'resumen_texto': "\n".join(resumen),
@@ -335,4 +399,6 @@ def generar_informe_pnl(archivo_compras, archivo_ventas, guardar_grafico=True, n
     
     except Exception as e:
         print(f"Error al generar informe PNL: {e}")
+        import traceback
+        traceback.print_exc()
         return None 
